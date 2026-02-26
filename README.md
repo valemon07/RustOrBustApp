@@ -4,8 +4,9 @@ Cross-platform application built with Electron and React
 To be continued
 
 ## Development instructions
-Enter the folder and run:
+Enter the folder in a terminal and run:
 ```
+npm install
 npm run dev
 ```
 (npm and Node.js must be installed)
