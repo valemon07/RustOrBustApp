@@ -7,6 +7,6 @@ To be continued
 Enter the folder in a terminal and run:
 ```
 npm install
-npm run dev
+npm start
 ```
 (npm and Node.js must be installed)
