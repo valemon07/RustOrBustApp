@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 
@@ -32,6 +32,7 @@ const createWindow = () => {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
+  ipcMain.on('open-file-dialog', handleOpenFileDialog)
   createWindow();
 
   // On OS X it's common to re-create a window in the app when the
@@ -41,6 +42,7 @@ app.whenReady().then(() => {
       createWindow();
     }
   });
+  
 });
 
 // Quit when all windows are closed, except on macOS. There, it's common
@@ -54,3 +56,17 @@ app.on('window-all-closed', () => {
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and import them here.
+const handleOpenFileDialog = () => {
+  dialog.showOpenDialog({
+    filters: [
+        { name: 'Images', extensions: ['jpg', 'png', 'gif'] },
+        { name: 'Movies', extensions: ['mkv', 'avi', 'mp4'] },
+        { name: 'Custom File Type', extensions: ['as'] },
+        { name: 'All Files', extensions: ['*'] }
+    ],
+    properties: [
+      "openFile",
+      "multiSelections"
+    ]
+  })
+};

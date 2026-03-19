@@ -1,5 +1,8 @@
 import React from "react";
 import "/src/assets/folder-open-solid-full.svg";
+//import { ipcRenderer } from "electron/renderer";
+
+//const { ipcRenderer } = require("electron/renderer");
 
 const FileUpload = ({ className, onClick }) => {
   return (
@@ -16,6 +19,18 @@ const FileUpload = ({ className, onClick }) => {
 
 const clickHandler = () => {
   alert("File handling will be implemented here");
+  // dialog.showOpenDialog({
+  //     filters: [
+  //         { name: 'Images', extensions: ['jpg', 'png', 'gif'] },
+  //         { name: 'Movies', extensions: ['mkv', 'avi', 'mp4'] },
+  //         { name: 'Custom File Type', extensions: ['as'] },
+  //         { name: 'All Files', extensions: ['*'] }
+  //     ],
+  //     properties: [
+  //       "openFile",
+  //       "multiSelections"
+  //     ]
+  //   })
 };
 
 export default function CenterPanel() {
