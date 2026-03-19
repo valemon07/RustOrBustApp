@@ -9,6 +9,7 @@ import './themes.css';
 import { createRoot } from 'react-dom/client';
 import CenterPanel from './Components/CenterPanel';
 
+
 // Defines the App component which will contain the rest of the components in the app.
 const App = () => {
   return (
