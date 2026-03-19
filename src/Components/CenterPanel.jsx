@@ -17,20 +17,13 @@ const FileUpload = ({ className, onClick }) => {
   );
 };
 
-const clickHandler = () => {
-  alert("File handling will be implemented here");
-  // dialog.showOpenDialog({
-  //     filters: [
-  //         { name: 'Images', extensions: ['jpg', 'png', 'gif'] },
-  //         { name: 'Movies', extensions: ['mkv', 'avi', 'mp4'] },
-  //         { name: 'Custom File Type', extensions: ['as'] },
-  //         { name: 'All Files', extensions: ['*'] }
-  //     ],
-  //     properties: [
-  //       "openFile",
-  //       "multiSelections"
-  //     ]
-  //   })
+const clickHandler = async () => {
+  //alert("File handling will be implemented here");
+  const result = await window.electronAPI.openFile();
+  if (!result.canceled) {
+    // use result.filePaths (array)
+    console.log('Selected files:', result.filePaths);
+  }
 };
 
 export default function CenterPanel() {

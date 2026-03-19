@@ -2,5 +2,5 @@
 // https://www.electronjs.org/docs/latest/tutorial/process-model#preload-scripts
 import { contextBridge, ipcRenderer } from "electron/renderer";
 contextBridge.exposeInMainWorld('electronAPI', {
-  setTitle: (title) => ipcRenderer.send('set-title', title)
+  openFile: (title) => ipcRenderer.invoke('dialog:openFile')
 })
