@@ -5,3 +5,10 @@
     --bg-color: hsl(0 0% 95%);
     --border-color: hsl(0 0% 80%);
 }
+.dark-theme {
+    --primary-color: hsl(260 60% 50%);
+    --secondary-color: hsl(260 60% 70%);
+    --text-color: hsl(0 0% 95%);
+    --bg-color: hsl(0 0% 20%);
+    --border-color: hsl(0 0% 80%);
+}
