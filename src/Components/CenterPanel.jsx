@@ -1,5 +1,8 @@
 import React from "react";
 import "/src/assets/folder-open-solid-full.svg";
+//import { ipcRenderer } from "electron/renderer";
+
+//const { ipcRenderer } = require("electron/renderer");
 
 const FileUpload = ({ className, onClick }) => {
   return (
@@ -14,8 +17,13 @@ const FileUpload = ({ className, onClick }) => {
   );
 };
 
-const clickHandler = () => {
-  alert("File handling will be implemented here");
+const clickHandler = async () => {
+  //alert("File handling will be implemented here");
+  const result = await window.electronAPI.openFile();
+  if (!result.canceled) {
+    // use result.filePaths (array)
+    console.log('Selected files:', result.filePaths);
+  }
 };
 
 export default function CenterPanel() {

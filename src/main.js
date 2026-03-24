@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 
@@ -14,6 +14,8 @@ const createWindow = () => {
     height: 600,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false
     },
   });
 
@@ -41,6 +43,7 @@ app.whenReady().then(() => {
       createWindow();
     }
   });
+  
 });
 
 // Quit when all windows are closed, except on macOS. There, it's common
@@ -54,3 +57,20 @@ app.on('window-all-closed', () => {
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and import them here.
+
+ipcMain.handle('dialog:openFile', async () => {
+  // result is an array of filepaths
+  const result = await dialog.showOpenDialog({
+    filters: [
+        { name: 'Images', extensions: ['jpg', 'png', 'gif'] },
+        { name: 'Movies', extensions: ['mkv', 'avi', 'mp4'] },
+        { name: 'Custom File Type', extensions: ['as'] },
+        { name: 'All Files', extensions: ['*'] }
+    ],
+    properties: [
+      "openFile",
+      "multiSelections"
+    ]
+  });
+  return result; // { canceled, filePaths }
+});
