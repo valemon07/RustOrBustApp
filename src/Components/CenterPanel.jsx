@@ -25,23 +25,32 @@ const clickHandler = async () => {
 };
 
 const sendFiles = async (files) => {
-  const formData = new FormData();
-  for (const file in files) {
-    formData.append(file, files[file])
-  }
-  
-  try { 
-    const response = () => { 
-      fetch("localhost://5000", {
-        method: "POST",
-        body: formData
-      })
-    };
-  }
-  catch (e) {
-    console.log("Error! " + e);
-  }
-  
+    const formData = new FormData();
+
+    for (const filePath of files) {
+        // Convert the file path to a Blob so it can be sent over HTTP
+        const response = await fetch(filePath);
+        const blob = await response.blob();
+        const fileName = filePath.split('/').pop(); // extract filename from path
+        formData.append('image', blob, fileName);
+    }
+
+    try {
+        const response = await fetch('http://localhost:5001/analyze', {
+            method: 'POST',
+            body: formData
+        });
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'results.csv';
+        a.click();
+
+    } catch (e) {
+        console.log("Error! " + e);
+    }
 };
 
 
