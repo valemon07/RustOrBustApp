@@ -3,4 +3,5 @@
 import { contextBridge, ipcRenderer } from "electron/renderer";
 contextBridge.exposeInMainWorld('electronAPI', {
   openFile: (title) => ipcRenderer.invoke('dialog:openFile')
-})
+});
+contextBridge.exposeInMainWorld('electronAPI', {readFile: (filePath) => ipcRenderer.invoke('file:read', filePath)}); 
