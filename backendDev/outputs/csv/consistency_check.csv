@@ -1,0 +1,195 @@
+filename,specimen_id,label,scale_um_per_px,scale_bar_um,roi_width_um,roi_height_um,macro_pit_count,macro_density_per_cm,full_pit_count,full_density_per_cm,flagged,flag_reasons,error
+CR3-1_1-side_pit_BF001.jpg,CR3-1,moderate,0.6701030927835051,,691.55,804.12,0,0.0,11,159.06,YES,macro_pit_count=0,
+CR3-1_1-side_pit_BF005.jpg,CR3-1,moderate,0.15463917525773196,,165.31,185.57,0,0.0,0,0.0,YES,"scale 0.1546 outside [0.5,10.0]; macro_pit_count=0; roi_width 165um < 200; roi_height 186um < 200",
+CR3-1_1-side_pit_BF006.jpg,CR3-1,moderate,0.15463917525773196,,213.25,185.57,0,0.0,0,0.0,YES,"scale 0.1546 outside [0.5,10.0]; macro_pit_count=0; roi_height 186um < 200",
+CR3-1_1-side_pit_BF007.jpg,CR3-1,moderate,,,,,0,0.0,0,0.0,YES,"exception: Could not read the µm value from the scale bar label.
+Options:
+  1. Install pytesseract:  pip install pytesseract
+                           brew install tesseract
+  2. Pass the value directly: detect_scale_bar(img, um_value_override=150.0)","Could not read the µm value from the scale bar label.
+Options:
+  1. Install pytesseract:  pip install pytesseract
+                           brew install tesseract
+  2. Pass the value directly: detect_scale_bar(img, um_value_override=150.0)"
+CR3-1_1-side_pit_DF001.jpg,CR3-1,moderate,,,,,0,0.0,0,0.0,YES,"exception: Could not read the µm value from the scale bar label.
+Options:
+  1. Install pytesseract:  pip install pytesseract
+                           brew install tesseract
+  2. Pass the value directly: detect_scale_bar(img, um_value_override=150.0)","Could not read the µm value from the scale bar label.
+Options:
+  1. Install pytesseract:  pip install pytesseract
+                           brew install tesseract
+  2. Pass the value directly: detect_scale_bar(img, um_value_override=150.0)"
+CR3-1_c-side_pit_BF001.jpg,CR3-1,moderate,0.15625,,205.62,187.5,0,0.0,0,0.0,YES,"scale 0.1562 outside [0.5,10.0]; macro_pit_count=0; roi_height 188um < 200",
+CR3-7 c-side BF002.jpg,CR3-7,severe,1.048951048951049,,1517.83,1258.74,6,39.53,63,415.07,NO,,
+CR3-7_c-side_BF001.jpg,CR3-7,severe,,,,,0,0.0,0,0.0,YES,"exception: Could not read the µm value from the scale bar label.
+Options:
+  1. Install pytesseract:  pip install pytesseract
+                           brew install tesseract
+  2. Pass the value directly: detect_scale_bar(img, um_value_override=150.0)","Could not read the µm value from the scale bar label.
+Options:
+  1. Install pytesseract:  pip install pytesseract
+                           brew install tesseract
+  2. Pass the value directly: detect_scale_bar(img, um_value_override=150.0)"
+CR3-7_c-side_BF002.jpg,CR3-7,severe,1.048951048951049,,1517.83,1258.74,6,39.53,63,415.07,NO,,
+CR3-7_c-side_BF003.jpg,CR3-7,severe,1.048951048951049,,1555.59,1258.74,8,51.43,90,578.56,NO,,
+CR3-7_c-side_BF004.jpg,CR3-7,severe,1.048951048951049,,1443.36,1258.74,2,13.86,90,623.55,NO,,
+CR3-7_c-side_BF005.jpg,CR3-7,severe,1.0344827586206897,,1465.86,1241.38,1,6.82,13,88.69,NO,,
+CR3-7_c-side_BF006.jpg,CR3-7,severe,1.0273972602739727,,1455.82,1232.88,0,0.0,24,164.86,YES,macro_pit_count=0,
+CR3-7_c-side_BF007.jpg,CR3-7,severe,1.0273972602739727,,1704.45,1232.88,5,29.33,33,193.61,NO,,
+CR3-7_c-side_BF008.jpg,CR3-7,severe,1.0344827586206897,,1735.86,1241.38,2,11.52,86,495.43,NO,,
+CR3-7_c-side_BF009.jpg,CR3-7,severe,,,,,0,0.0,0,0.0,YES,"exception: Could not read the µm value from the scale bar label.
+Options:
+  1. Install pytesseract:  pip install pytesseract
+                           brew install tesseract
+  2. Pass the value directly: detect_scale_bar(img, um_value_override=150.0)","Could not read the µm value from the scale bar label.
+Options:
+  1. Install pytesseract:  pip install pytesseract
+                           brew install tesseract
+  2. Pass the value directly: detect_scale_bar(img, um_value_override=150.0)"
+CR3-8_c-side_pit001.jpg,CR3-8,severe,3.1088082901554404,,3988.6,3730.57,67,167.98,800,2005.72,NO,,
+CR3-8_c-side_pit002.jpg,CR3-8,severe,3.1088082901554404,,3982.38,3730.57,34,85.38,459,1152.58,NO,,
+CR3-8_c-side_pit003.jpg,CR3-8,severe,0.7853403141361257,,1100.26,942.41,2,18.18,59,536.24,NO,,
+CR3-8_c-side_pit004.jpg,CR3-8,severe,0.7853403141361257,,1135.6,942.41,4,35.22,51,449.1,NO,,
+CR3-8_c-side_pit005.jpg,CR3-8,severe,0.7853403141361257,,1165.45,942.41,6,51.48,79,677.85,NO,,
+CR3-8_c-side_pit006.jpg,CR3-8,severe,0.7853403141361257,,1201.57,942.41,6,49.93,93,773.99,NO,,
+CR3-8_c8-side_pit001.jpg,CR3-8,severe,,,,,0,0.0,0,0.0,YES,"exception: Could not read the µm value from the scale bar label.
+Options:
+  1. Install pytesseract:  pip install pytesseract
+                           brew install tesseract
+  2. Pass the value directly: detect_scale_bar(img, um_value_override=150.0)","Could not read the µm value from the scale bar label.
+Options:
+  1. Install pytesseract:  pip install pytesseract
+                           brew install tesseract
+  2. Pass the value directly: detect_scale_bar(img, um_value_override=150.0)"
+CR3-8_c8-side_pit002.jpg,CR3-8,severe,,,,,0,0.0,0,0.0,YES,"exception: Could not read the µm value from the scale bar label.
+Options:
+  1. Install pytesseract:  pip install pytesseract
+                           brew install tesseract
+  2. Pass the value directly: detect_scale_bar(img, um_value_override=150.0)","Could not read the µm value from the scale bar label.
+Options:
+  1. Install pytesseract:  pip install pytesseract
+                           brew install tesseract
+  2. Pass the value directly: detect_scale_bar(img, um_value_override=150.0)"
+CR3-8_c8-side_pit003.jpg,CR3-8,severe,0.7731958762886598,,1169.07,927.84,3,25.66,56,479.01,NO,,
+CR3-8_c8-side_pit004.jpg,CR3-8,severe,0.7772020725388601,,1216.32,932.64,5,41.11,58,476.85,NO,,
+CR3-8_c8-side_pit005.jpg,CR3-8,severe,5.958549222797927,,9307.25,7150.26,175,188.03,338,363.16,NO,,
+CR3-9_9-side_pit001.jpg,CR3-9,severe,1.0344827586206897,,1555.86,1241.38,3,19.28,67,430.63,NO,,
+CR3-9_9-side_pit002.jpg,CR3-9,severe,1.0344827586206897,,1552.76,1241.38,3,19.32,77,495.89,NO,,
+CR3-9_9-side_pit003.jpg,CR3-9,severe,1.0344827586206897,,1644.83,1241.38,5,30.4,73,443.81,NO,,
+CR3-9_9-side_pit004.jpg,CR3-9,severe,7.931034482758621,,12610.34,9517.24,206,163.36,289,229.18,NO,,
+CR3-9_9-side_pit005.jpg,CR3-9,severe,1.0344827586206897,,1640.69,1241.38,2,12.19,47,286.46,NO,,
+CR3-9_9-side_pit006.jpg,CR3-9,severe,10.95890410958904,,14991.78,11660.27,347,231.46,373,248.8,YES,"scale 10.9589 outside [0.5,10.0]",
+CR3-9_c-side_pit001.jpg,CR3-9,severe,4.137931034482759,,4986.21,4593.1,56,112.31,285,571.58,NO,,
+CR3-9_c-side_pit002.jpg,CR3-9,severe,1.048951048951049,,1358.39,1258.74,3,22.08,81,596.29,NO,,
+CR3-9_c-side_pit003.jpg,CR3-9,severe,1.048951048951049,,1377.27,1258.74,7,50.83,72,522.77,NO,,
+CR3-9_c-side_pit004.jpg,CR3-9,severe,1.048951048951049,,1407.69,1258.74,3,21.31,87,618.03,NO,,
+CR3-9_c-side_pit005.jpg,CR3-9,severe,1.0344827586206897,,1555.86,1241.38,3,19.28,69,443.48,NO,,
+cr3-1_initiation_pit_birdseye_view001.jpg,CR3-1,moderate,,,,,0,0.0,0,0.0,YES,exception: No green blobs found in the bottom-right region. Check HSV_LOWER_GREEN / HSV_UPPER_GREEN constants.,No green blobs found in the bottom-right region. Check HSV_LOWER_GREEN / HSV_UPPER_GREEN constants.
+cr3-1_initiation_pit_birdseye_view002.jpg,CR3-1,moderate,3.1446540880503147,,4295.6,2374.21,41,95.45,237,551.73,NO,,
+cr3-1_initiation_pit_birdseye_view003.jpg,CR3-1,moderate,1.037344398340249,,1820.54,920.12,9,49.44,106,582.24,NO,,
+cr3-1_initiation_pit_birdseye_view004.jpg,CR3-1,moderate,,,,,0,0.0,0,0.0,YES,"exception: Could not read the µm value from the scale bar label.
+Options:
+  1. Install pytesseract:  pip install pytesseract
+                           brew install tesseract
+  2. Pass the value directly: detect_scale_bar(img, um_value_override=150.0)","Could not read the µm value from the scale bar label.
+Options:
+  1. Install pytesseract:  pip install pytesseract
+                           brew install tesseract
+  2. Pass the value directly: detect_scale_bar(img, um_value_override=150.0)"
+cr3-1_initiation_pit_sideview001.jpg,CR3-1,moderate,,,,,0,0.0,0,0.0,YES,"exception: Could not read the µm value from the scale bar label.
+Options:
+  1. Install pytesseract:  pip install pytesseract
+                           brew install tesseract
+  2. Pass the value directly: detect_scale_bar(img, um_value_override=150.0)","Could not read the µm value from the scale bar label.
+Options:
+  1. Install pytesseract:  pip install pytesseract
+                           brew install tesseract
+  2. Pass the value directly: detect_scale_bar(img, um_value_override=150.0)"
+cr3-1_initiation_pit_sideview002.jpg,CR3-1,moderate,,,,,0,0.0,0,0.0,YES,exception: No green blobs found in the bottom-right region. Check HSV_LOWER_GREEN / HSV_UPPER_GREEN constants.,No green blobs found in the bottom-right region. Check HSV_LOWER_GREEN / HSV_UPPER_GREEN constants.
+cr3-3_3-side001.jpg,CR3-3,moderate,,,,,0,0.0,0,0.0,YES,"exception: Could not read the µm value from the scale bar label.
+Options:
+  1. Install pytesseract:  pip install pytesseract
+                           brew install tesseract
+  2. Pass the value directly: detect_scale_bar(img, um_value_override=150.0)","Could not read the µm value from the scale bar label.
+Options:
+  1. Install pytesseract:  pip install pytesseract
+                           brew install tesseract
+  2. Pass the value directly: detect_scale_bar(img, um_value_override=150.0)"
+cr3-3_3-side_DF001.jpg,CR3-3,moderate,,,,,0,0.0,0,0.0,YES,"exception: Could not read the µm value from the scale bar label.
+Options:
+  1. Install pytesseract:  pip install pytesseract
+                           brew install tesseract
+  2. Pass the value directly: detect_scale_bar(img, um_value_override=150.0)","Could not read the µm value from the scale bar label.
+Options:
+  1. Install pytesseract:  pip install pytesseract
+                           brew install tesseract
+  2. Pass the value directly: detect_scale_bar(img, um_value_override=150.0)"
+cr3-3_ci-side006.jpg,CR3-3,moderate,0.07874015748031496,,87.32,94.49,0,0.0,0,0.0,YES,"scale 0.0787 outside [0.5,10.0]; macro_pit_count=0; roi_width 87um < 200; roi_height 94um < 200",
+cr3-3_ci-side008.jpg,CR3-3,moderate,,,,,0,0.0,0,0.0,YES,"exception: Could not read the µm value from the scale bar label.
+Options:
+  1. Install pytesseract:  pip install pytesseract
+                           brew install tesseract
+  2. Pass the value directly: detect_scale_bar(img, um_value_override=150.0)","Could not read the µm value from the scale bar label.
+Options:
+  1. Install pytesseract:  pip install pytesseract
+                           brew install tesseract
+  2. Pass the value directly: detect_scale_bar(img, um_value_override=150.0)"
+cr3-3_ci-side009.jpg,CR3-3,moderate,0.07874015748031496,,115.04,94.49,0,0.0,0,0.0,YES,"scale 0.0787 outside [0.5,10.0]; macro_pit_count=0; roi_width 115um < 200; roi_height 94um < 200",
+cr3-3_ci-side010.jpg,CR3-3,moderate,,,,,0,0.0,0,0.0,YES,"exception: Could not read the µm value from the scale bar label.
+Options:
+  1. Install pytesseract:  pip install pytesseract
+                           brew install tesseract
+  2. Pass the value directly: detect_scale_bar(img, um_value_override=150.0)","Could not read the µm value from the scale bar label.
+Options:
+  1. Install pytesseract:  pip install pytesseract
+                           brew install tesseract
+  2. Pass the value directly: detect_scale_bar(img, um_value_override=150.0)"
+cr3-3_ci-side_DF001.jpg,CR3-3,moderate,0.26490066225165565,,278.94,317.88,0,0.0,0,0.0,YES,"scale 0.2649 outside [0.5,10.0]; macro_pit_count=0",
+cr3-3_ci-side_DF002.jpg,CR3-3,moderate,0.26490066225165565,,333.77,317.88,0,0.0,0,0.0,YES,"scale 0.2649 outside [0.5,10.0]; macro_pit_count=0",
+cr3-7_7_side_overview001.jpg,CR3-7,severe,,,,,0,0.0,0,0.0,YES,"exception: Could not read the µm value from the scale bar label.
+Options:
+  1. Install pytesseract:  pip install pytesseract
+                           brew install tesseract
+  2. Pass the value directly: detect_scale_bar(img, um_value_override=150.0)","Could not read the µm value from the scale bar label.
+Options:
+  1. Install pytesseract:  pip install pytesseract
+                           brew install tesseract
+  2. Pass the value directly: detect_scale_bar(img, um_value_override=150.0)"
+cr3-7_c_side_overview001.jpg,CR3-7,severe,4.219409282700422,,4784.81,3531.65,30,62.7,171,357.38,NO,,
+cr3-7_c_side_overview003.jpg,CR3-7,severe,4.219409282700422,,4573.84,3527.43,28,61.22,181,395.73,NO,,
+cr3-8_8_side_overview001.jpg,CR3-8,severe,4.201680672268908,,6235.29,3117.65,219,351.23,731,1172.36,NO,,
+cr3-8_8_side_overview002.jpg,CR3-8,severe,4.219409282700422,,4683.54,2957.81,30,64.05,131,279.7,NO,,
+cr3-8_8_side_overview003.jpg,CR3-8,severe,4.219409282700422,,4641.35,3185.65,16,34.47,104,224.07,NO,,
+cr3-8_8_side_overview004.jpg,CR3-8,severe,4.219409282700422,,1599.16,3523.21,15,93.8,53,331.42,NO,,
+cr3-8_8_side_overview005.jpg,CR3-8,severe,4.219409282700422,,6248.95,3578.06,45,72.01,172,275.25,NO,,
+cr3-8_8_side_overview006.jpg,CR3-8,severe,4.219409282700422,,6261.6,3620.25,169,269.9,725,1157.85,NO,,
+cr3-8_c_side_overview001.jpg,CR3-8,severe,4.201680672268908,,6281.51,3130.25,245,390.03,704,1120.75,NO,,
+cr3-8_c_side_overview002.jpg,CR3-8,severe,4.184100418410042,,2903.77,2895.4,33,113.65,114,392.59,NO,,
+cr3-8_c_side_overview003.jpg,CR3-8,severe,4.166666666666667,,3358.33,2870.83,27,80.4,96,285.86,NO,,
+cr3-8_c_side_overview004.jpg,CR3-8,severe,4.166666666666667,,3400.0,3616.67,32,94.12,153,450.0,NO,,
+cr3-9 c side overview003.jpg,CR3-9,severe,4.201680672268908,,4920.17,3684.87,16,32.52,62,126.01,NO,,
+cr3-9_9_side_overview001.jpg,CR3-9,severe,4.219409282700422,,869.2,2852.32,2,23.01,6,69.03,NO,,
+cr3-9_9_side_overview002.jpg,CR3-9,severe,4.219409282700422,,5029.54,2831.22,30,59.65,117,232.63,NO,,
+cr3-9_9_side_overview003.jpg,CR3-9,severe,4.219409282700422,,5004.22,2831.22,28,55.95,125,249.79,NO,,
+cr3-9_9_side_overview004.jpg,CR3-9,severe,4.219409282700422,,5886.08,2873.42,41,69.66,145,246.34,NO,,
+cr3-9_c_side_overview001.jpg,CR3-9,severe,,,,,0,0.0,0,0.0,YES,"exception: Could not read the µm value from the scale bar label.
+Options:
+  1. Install pytesseract:  pip install pytesseract
+                           brew install tesseract
+  2. Pass the value directly: detect_scale_bar(img, um_value_override=150.0)","Could not read the µm value from the scale bar label.
+Options:
+  1. Install pytesseract:  pip install pytesseract
+                           brew install tesseract
+  2. Pass the value directly: detect_scale_bar(img, um_value_override=150.0)"
+cr3-9_c_side_overview002.jpg,CR3-9,severe,,,,,0,0.0,0,0.0,YES,"exception: Could not read the µm value from the scale bar label.
+Options:
+  1. Install pytesseract:  pip install pytesseract
+                           brew install tesseract
+  2. Pass the value directly: detect_scale_bar(img, um_value_override=150.0)","Could not read the µm value from the scale bar label.
+Options:
+  1. Install pytesseract:  pip install pytesseract
+                           brew install tesseract
+  2. Pass the value directly: detect_scale_bar(img, um_value_override=150.0)"
+cr3-9_c_side_overview003.jpg,CR3-9,severe,4.201680672268908,,4920.17,3684.87,16,32.52,62,126.01,NO,,
+cr3-9_c_side_overview004.jpg,CR3-9,severe,4.201680672268908,,4710.08,3697.48,31,65.82,113,239.91,NO,,
