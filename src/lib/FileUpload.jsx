@@ -4,43 +4,141 @@ export default function FileUpload({ className }) {
   
   // Function to send files to the backend
   // Takes in a files array, which could be a list of filePaths or Files
-  const sendFiles = async (files) => {
-    // FormData is used to send files in a POST request
-    const formData = new FormData(); 
-    
-    for (const entry of files) {
-      // Used for drag-and-drop, where entry is a File object
-
-      if (entry instanceof File) {
-        formData.append('image', entry, entry.name);
-      } else {
-        // Used for click-to-upload, where entry is a file path string
-
-        const file = new File([entry], entry.split("/").pop());
-        //const file = await window.electronAPI.readFile(filePath);
-        formData.append('image', file, file.name);
-      }
+  const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+  
+  /**
+   * Upload files in parallel with concurrency, optional batching, retries and progress.
+   * - files: FileList | File[] | array of file paths (if using existing path behavior)
+   * - options: { concurrency, batchSize, maxRetries, onProgress, endpoint }
+   *
+   * Behavior:
+   * - If batchSize === 1: each request contains a single file (many parallel requests).
+   * - If batchSize > 1: groups of `batchSize` files are sent in one request.
+   * - Response bodies are read as text and concatenated into one CSV. Headers after the first are stripped.
+   */
+  async function uploadFilesParallel(rawFiles, options = {}) {
+    const {
+      concurrency = 6,
+      batchSize = 1,
+      maxRetries = 2,
+      onProgress = () => {},
+      endpoint = "http://localhost:5001/analyze",
+    } = options;
+  
+    // normalize to array of File objects or file-path strings (preserves your current behavior)
+    const files = Array.from(rawFiles);
+  
+    // create batches: each batch is an array of file or path entries
+    const batches = [];
+    for (let i = 0; i < files.length; i += batchSize) {
+      batches.push(files.slice(i, i + batchSize));
     }
-
-    try {
-      // Send the files to the backend at the /analyze endpoint
-      const response = await fetch("http://localhost:5001/analyze", {
-        method: "POST",
-        body: formData,
-      });
-
-      // Test results from the simple backend
-      const blob = await response.blob();
+  
+    let completed = 0;
+    const results = new Array(batches.length);
+  
+    // worker function: uploads one batch, with retries
+    const uploadBatch = async (batch, batchIndex) => {
+      let attempt = 0;
+      while (true) {
+        try {
+          const formData = new FormData();
+          for (const entry of batch) {
+            if (entry instanceof File) {
+              formData.append("image", entry, entry.name);
+            } else {
+              // keep behavior for path strings (existing electron API). This creates a placeholder File:
+              const filePath = entry;
+              const file = new File([filePath], filePath.split("/").pop());
+              formData.append("image", file, file.name);
+            }
+          }
+  
+          const res = await fetch(endpoint, {
+            method: "POST",
+            body: formData,
+          });
+  
+          // if you expect binary results, use res.blob() — here we read text (CSV) and combine later
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const text = await res.text();
+          results[batchIndex] = text;
+          completed += batch.length;
+          onProgress({ completed, total: files.length, batchIndex });
+          return;
+        } catch (err) {
+          attempt += 1;
+          if (attempt > maxRetries) {
+            // store an empty string or error marker
+            results[batchIndex] = "";
+            completed += batch.length;
+            onProgress({ completed, total: files.length, batchIndex, error: err });
+            return;
+          }
+          // exponential backoff
+          await sleep(200 * Math.pow(2, attempt));
+        }
+      }
+    };
+  
+    // simple promise pool
+    let index = 0;
+    const workers = Array.from({ length: Math.min(concurrency, batches.length) }).map(
+      async () => {
+        while (index < batches.length) {
+          const i = index++;
+          await uploadBatch(batches[i], i);
+        }
+      }
+    );
+  
+    await Promise.all(workers);
+  
+  
+    // combine CSV texts, attempt to keep only first header
+    const nonEmpty = results.filter(Boolean);
+    if (nonEmpty.length === 0) return null;
+  
+    const combined = nonEmpty.reduce((acc, text, idx) => {
+      const lines = text.split(/\r?\n/).filter(Boolean);
+      if (idx === 0) return lines.join("\n");
+      // drop the first line (header) of subsequent responses if it looks like a header
+      if (lines.length > 0) {
+        lines.shift();
+        return acc + "\n" + lines.join("\n");
+      }
+      return acc;
+    }, "");
+  
+    // return combined CSV text (caller can save it)
+    return combined;
+  }
+  
+  // call for FileList from drop or array of File objects
+  const handleDropFiles = async (fileList) => {
+    const combinedCsv = await uploadFilesParallel(fileList, {
+      concurrency: 8,
+      batchSize: 1,        // 1 = one file per request; increase to batch multiple files per request
+      maxRetries: 3,
+      endpoint: "http://localhost:5001/analyze",
+      onProgress: ({ completed, total }) => {
+        console.log(`Uploaded ${completed}/${total}`);
+      },
+    });
+  
+    if (combinedCsv) {
+      const blob = new Blob([combinedCsv], { type: "text/csv" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = "results.csv";
       a.click();
-    } catch (e) {
-      console.log("Error! " + e);
+    } else {
+      console.log("No results returned.");
     }
   };
-
+  
+  
   // Handles clicks from on the FileUpload component, 
   // which opens a file dialog and sends the selected files to the backend
   const clickHandler = async () => {
@@ -49,7 +147,7 @@ export default function FileUpload({ className }) {
     if (!result.canceled) {
       // Prints result.filePaths (array) to test
       // console.log("Selected files:", result.filePaths);
-      sendFiles(result.filePaths);
+      handleDropFiles(result.filePaths);
     }
   };
   
@@ -67,7 +165,7 @@ export default function FileUpload({ className }) {
     e.stopPropagation();
     const draggedFiles = e.dataTransfer.files;
     if (draggedFiles && draggedFiles.length > 0) {
-      sendFiles(draggedFiles)
+      handleDropFiles(draggedFiles)
     }
   }
 
