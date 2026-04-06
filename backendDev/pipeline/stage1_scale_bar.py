@@ -38,7 +38,9 @@ import numpy as np
 # ---------------------------------------------------------------------------
 
 # Fraction of image dimensions that define the bottom-right search region.
-ROI_Y_FRACTION = 0.80   # start looking from 80 % down the image
+# Bottom 15 % × right 32 % — keeps specimen illumination (even bright-green
+# darkfield) outside the search window regardless of image type.
+ROI_Y_FRACTION = 0.85   # start looking from 85 % down the image
 ROI_X_FRACTION = 0.68   # start looking from 68 % across the image
 
 # HSV bounds for the microscope scale-bar green.
@@ -57,6 +59,14 @@ H_CLOSE_KERNEL_H = 3
 
 # Factor by which the ROI is upscaled before OCR (larger = better accuracy).
 OCR_UPSCALE = 4
+
+
+# ---------------------------------------------------------------------------
+# Public exceptions
+# ---------------------------------------------------------------------------
+
+class ScaleBarNotFoundError(RuntimeError):
+    """Raised when no green scale-bar blob can be located in the image."""
 
 
 # ---------------------------------------------------------------------------
@@ -86,13 +96,16 @@ def _isolate_green(bgr_roi):
     return merged_mask, raw_mask
 
 
-def _find_bar_contour(merged_mask):
+def _find_bar_contour(merged_mask, verbose=False):
     """
     Return the contour that best represents the horizontal scale bar.
 
     Selection criterion: largest width-to-height ratio among blobs with
     area >= MIN_BLOB_AREA.  The bar is wide and short; text characters are
     taller relative to their width.
+
+    When verbose=True, prints every candidate blob with its bbox, area, and
+    aspect ratio so callers can diagnose false-positive selections.
     """
     contours, _ = cv2.findContours(
         merged_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
@@ -102,15 +115,27 @@ def _find_bar_contour(merged_mask):
 
     best_contour = None
     best_ratio = -1.0
+    candidates = []
     for contour in contours:
         area = cv2.contourArea(contour)
         if area < MIN_BLOB_AREA:
             continue
         bx, by, bw, bh = cv2.boundingRect(contour)
         ratio = bw / max(bh, 1)
+        candidates.append((ratio, area, bx, by, bw, bh, contour))
         if ratio > best_ratio:
             best_ratio = ratio
             best_contour = contour
+
+    if verbose:
+        print(f"  [Stage 1 debug] blobs found    : {len(candidates)}")
+        for i, (ratio, area, bx, by, bw, bh, _) in enumerate(
+            sorted(candidates, key=lambda c: -c[0])
+        ):
+            marker = " ← SELECTED" if (best_contour is not None
+                                        and ratio == best_ratio) else ""
+            print(f"    blob #{i+1}: bbox=({bx},{by},{bw},{bh})"
+                  f"  area={area:.0f}  ratio={ratio:.1f}{marker}")
 
     return best_contour
 
@@ -232,9 +257,13 @@ def detect_scale_bar(image_input, um_value_override=None, verbose=False):
     # --- 2. Green masking and blob detection -------------------------------
     merged_mask, raw_mask = _isolate_green(roi_bgr)
 
-    bar_contour = _find_bar_contour(merged_mask)
+    if verbose:
+        green_px = int(np.count_nonzero(raw_mask))
+        print(f"  [Stage 1 debug] green pixels   : {green_px} in search ROI")
+
+    bar_contour = _find_bar_contour(merged_mask, verbose=verbose)
     if bar_contour is None:
-        raise RuntimeError(
+        raise ScaleBarNotFoundError(
             "No green blobs found in the bottom-right region. "
             "Check HSV_LOWER_GREEN / HSV_UPPER_GREEN constants."
         )

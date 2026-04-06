@@ -24,10 +24,11 @@ import cv2
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from pipeline.stage1_scale_bar     import detect_scale_bar
+from pipeline.stage1_scale_bar     import detect_scale_bar, ScaleBarNotFoundError
 from pipeline.stage2_roi           import extract_roi
 from pipeline.stage3_pit_detection import detect_pits
 from pipeline.stage4_density       import calculate_density
+from pipeline.config               import MANUAL_SCALE_OVERRIDES, NO_SCALE_BAR_IMAGES, EXCLUDED_SPECIMENS
 
 ROOT        = os.path.join(os.path.dirname(__file__), "..")
 RAW_DIR     = os.path.join(ROOT, "data", "raw")
@@ -72,6 +73,12 @@ MACRO_MIN_COUNT  = 1      # at least one macro pit expected
 def _flag_reasons(row):
     """Return list of reason strings for a result row; empty = clean."""
     reasons = []
+    if row.get("excluded"):
+        reasons.append("excluded_specimen")
+        return reasons
+    if row.get("no_scale_bar"):
+        reasons.append("no_scale_bar_found")
+        return reasons
     if row["error"]:
         reasons.append(f"exception: {row['error']}")
         return reasons
@@ -113,13 +120,29 @@ def _run_pipeline(image_path):
         "macro_density_per_cm": 0.0,
         "full_pit_count":     0,
         "full_density_per_cm": 0.0,
+        "no_scale_bar":       False,
+        "excluded":           False,
         "error":              None,
     }
 
+    # Excluded specimens are skipped entirely before any processing.
+    if specimen_id in EXCLUDED_SPECIMENS:
+        result["excluded"] = True
+        return result
+
     try:
-        # Stage 1 — detect scale bar and extract OCR µm value indirectly
-        # by back-calculating from scale and bar width.
-        scale_um_per_px, _ = detect_scale_bar(image_path)
+        # Stage 1 — detect scale bar.  Apply manual override when known.
+        stem = os.path.splitext(filename)[0]
+        if stem in NO_SCALE_BAR_IMAGES:
+            result["no_scale_bar"] = True
+            return result
+        um_override = MANUAL_SCALE_OVERRIDES.get(stem)
+        try:
+            scale_um_per_px, _ = detect_scale_bar(image_path,
+                                                   um_value_override=um_override)
+        except ScaleBarNotFoundError:
+            result["no_scale_bar"] = True
+            return result
         result["scale_um_per_px"] = scale_um_per_px
 
         # Stage 2
@@ -183,7 +206,62 @@ def _mean_std(values):
 # Main
 # ---------------------------------------------------------------------------
 
+def _cr3_diagnostic():
+    """
+    Verbose Stage 1 + Stage 2 diagnostic for a representative CR3-3 darkfield
+    image.  Prints blob-level detail so we can see why scale / ROI go wrong.
+    """
+    target = "cr3-3_ci-side_DF001.jpg"
+    path   = os.path.join(RAW_DIR, target)
+    if not os.path.exists(path):
+        print(f"  [diagnostic] {target} not found — skipping")
+        return
+
+    print(f"\n{'='*60}")
+    print(f"  CR3-3 Diagnostic: {target}")
+    print(f"{'='*60}")
+
+    import cv2 as _cv2
+    img = _cv2.imread(path)
+    if img is None:
+        print("  Cannot load image.")
+        return
+    h, w = img.shape[:2]
+    print(f"  Image size       : {w} x {h} px")
+
+    # Stage 1 verbose — prints search region, green pixel count, all blobs
+    try:
+        scale, _ = detect_scale_bar(path, verbose=True)
+        print(f"  Scale result     : {scale:.4f} µm/px")
+    except ScaleBarNotFoundError as exc:
+        print(f"  Stage 1 FAILED   : no_scale_bar_found ({exc})")
+        scale = None
+    except RuntimeError as exc:
+        print(f"  Stage 1 FAILED   : {exc}")
+        scale = None
+
+    if scale is None:
+        print("  Skipping Stage 2 (no valid scale).")
+        print(f"{'='*60}\n")
+        return
+
+    # Stage 2 — print ROI and pit counts
+    try:
+        _, _, roi_dims, _ = extract_roi(path, scale)
+        print(f"  ROI              : {roi_dims['width_px']} x {roi_dims['height_px']} px"
+              f"  ({roi_dims['width_um']:.0f} x {roi_dims['height_um']:.0f} µm)")
+        print(f"  surface_pits     : {len(roi_dims['surface_pits'])}")
+        print(f"  edge_pits        : {len(roi_dims['edge_pits'])}")
+    except Exception as exc:
+        print(f"  Stage 2 FAILED   : {exc}")
+
+    print(f"{'='*60}\n")
+
+
 def main():
+    # --- CR3-3 diagnostic (runs before main loop) -------------------------
+    _cr3_diagnostic()
+
     # --- Discover images ---------------------------------------------------
     pattern_lower = os.path.join(RAW_DIR, "*.jpg")
     pattern_upper = os.path.join(RAW_DIR, "*.jpeg")
@@ -302,11 +380,23 @@ def main():
     print("  SUMMARY")
     print("  " + "─" * 58)
 
-    successful  = [r for r in rows if not r["error"]]
-    failed      = [r for r in rows if r["error"]]
+    excluded       = [r for r in rows if r.get("excluded")]
+    in_scope       = [r for r in rows if not r.get("excluded")]
+    successful     = [r for r in in_scope if not r["error"] and not r.get("no_scale_bar")]
+    failed         = [r for r in in_scope if r["error"]]
+    no_scale_bar   = [r for r in in_scope if r.get("no_scale_bar")]
 
-    print(f"  Images processed : {len(rows)}")
+    print(f"  Images in dataset : {len(rows)}")
+    print(f"  Excluded (out of scope): {len(excluded)}")
+    if excluded:
+        specs = sorted(set(r["specimen_id"] for r in excluded))
+        print(f"    specimens: {specs}")
+    print(f"  In-scope images  : {len(in_scope)}")
     print(f"  Successful       : {len(successful)}")
+    print(f"  No scale bar     : {len(no_scale_bar)}")
+    if no_scale_bar:
+        for r in no_scale_bar:
+            print(f"    ○ {r['filename']}")
     print(f"  Errors (exception): {len(failed)}")
     if failed:
         for r in failed:
@@ -322,18 +412,18 @@ def main():
     for key, count in sorted(reason_counts.items()):
         print(f"    {key}: {count}")
 
-    # Class distribution
+    # Class distribution (in-scope successful only)
     print()
     label_counts = {}
     for row in successful:
         label_counts[row["label"]] = label_counts.get(row["label"], 0) + 1
-    print("  Class distribution:")
+    print("  Class distribution (in-scope successful):")
     for lbl, count in sorted(label_counts.items()):
         print(f"    {lbl}: {count}")
 
     # Per-class statistics
     print()
-    print("  Per-class statistics (successful images):")
+    print("  Per-class statistics (in-scope successful images):")
     for lbl in sorted(set(r["label"] for r in successful)):
         subset = [r for r in successful if r["label"] == lbl]
         densities = [r["macro_density_per_cm"] for r in subset]
@@ -360,12 +450,12 @@ def main():
         print(f"    min   : {min_d:.2f} pits/cm")
         print(f"    max   : {max_d:.2f} pits/cm")
 
-    # Specimens where ALL images were flagged
-    specimen_ids = sorted(set(r["specimen_id"] for r in rows
+    # In-scope specimens where ALL images were flagged
+    specimen_ids = sorted(set(r["specimen_id"] for r in in_scope
                               if r["specimen_id"] != "unknown"))
     all_flagged_specimens = []
     for spec in specimen_ids:
-        spec_rows = [r for r in rows if r["specimen_id"] == spec]
+        spec_rows = [r for r in in_scope if r["specimen_id"] == spec]
         if all(r["_flag_reasons"] for r in spec_rows):
             all_flagged_specimens.append(spec)
     if all_flagged_specimens:
