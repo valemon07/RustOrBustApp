@@ -1,5 +1,10 @@
 # CLAUDE.md — Rust or Bust Pipeline
 
+## Project Root
+- Repo: `~/RustOrBustApp`
+- Backend: `~/RustOrBustApp/BackendDev`
+- All relative paths in this file (e.g. `/pipeline/`, `/tests/`, `data/raw/`) are relative to the BackendDev directory.
+
 ## Project Purpose
 This is a materials science image analysis pipeline for detecting and 
 classifying corrosion pits in optical microscopy images of aluminum 
