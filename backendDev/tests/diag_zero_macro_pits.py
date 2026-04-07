@@ -46,7 +46,7 @@ def _diag_one(filename):
 
     # ── Stage 1 ──────────────────────────────────────────────────────────────
     um_override = MANUAL_SCALE_OVERRIDES.get(stem)
-    scale, _ = detect_scale_bar(path, um_value_override=um_override, verbose=True)
+    scale, _, _ = detect_scale_bar(path, um_value_override=um_override, verbose=True)
     print(f"\n  Stage 1 → scale = {scale:.4f} µm/px")
 
     # ── Stage 2 ──────────────────────────────────────────────────────────────

@@ -28,7 +28,7 @@ def main():
         sys.exit(1)
 
     try:
-        scale_um_per_px, _  = detect_scale_bar(SAMPLE_IMAGE)
+        scale_um_per_px, _, _ = detect_scale_bar(SAMPLE_IMAGE)
         specimen_mask, _, roi_dims, _ = extract_roi(SAMPLE_IMAGE, scale_um_per_px)
         confirmed_pits, rejected, debug_vis = detect_pits(
             SAMPLE_IMAGE, scale_um_per_px, specimen_mask, roi_dims

@@ -62,7 +62,7 @@ def _resolve_image_path(primary_rel, fallback_rel):
 def _run_stage1(image_path, expected_um):
     """Run Stage 1, falling back to the known µm value if OCR fails."""
     try:
-        scale_um_per_px, _ = detect_scale_bar(image_path)
+        scale_um_per_px, _, _ = detect_scale_bar(image_path)
         return scale_um_per_px, "OCR"
     except RuntimeError as exc:
         error_text = str(exc)

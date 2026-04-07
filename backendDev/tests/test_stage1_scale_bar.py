@@ -71,14 +71,14 @@ def _run_one(image_rel_path, expected_um, expected_bar_px, debug_filename):
 
     # --- First attempt: full OCR -----------------------------------------
     try:
-        scale_um_per_px, debug_vis = detect_scale_bar(image_path)
+        scale_um_per_px, _, debug_vis = detect_scale_bar(image_path)
         result["ocr_method"] = "OCR"
     except RuntimeError as exc:
         error_text = str(exc)
         if "pytesseract" in error_text or "µm value" in error_text:
             # --- Fallback: known µm value --------------------------------
             try:
-                scale_um_per_px, debug_vis = detect_scale_bar(
+                scale_um_per_px, _, debug_vis = detect_scale_bar(
                     image_path, um_value_override=expected_um
                 )
                 result["ocr_method"] = f"override={expected_um:.0f}µm"
