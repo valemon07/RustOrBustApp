@@ -109,20 +109,25 @@ def _run_pipeline(image_path):
     label       = _classify(specimen_id)
 
     result = {
-        "filename":           filename,
-        "specimen_id":        specimen_id or "unknown",
-        "label":              label,
-        "scale_um_per_px":    None,
-        "scale_bar_um":       None,
-        "roi_width_um":       None,
-        "roi_height_um":      None,
-        "macro_pit_count":    0,
+        "filename":             filename,
+        "specimen_id":          specimen_id or "unknown",
+        "label":                label,
+        "scale_um_per_px":      None,
+        "scale_bar_um":         None,
+        "roi_width_um":         None,
+        "roi_height_um":        None,
+        "macro_pit_count":      0,
         "macro_density_per_cm": 0.0,
-        "full_pit_count":     0,
-        "full_density_per_cm": 0.0,
-        "no_scale_bar":       False,
-        "excluded":           False,
-        "error":              None,
+        "full_pit_count":       0,
+        "full_density_per_cm":  0.0,
+        "pit_count":            0,
+        "pit_density_per_cm2":  0.0,
+        "avg_pit_depth_um":     None,
+        "max_pit_depth_um":     None,
+        "pit_depths_um":        [],
+        "no_scale_bar":         False,
+        "excluded":             False,
+        "error":                None,
     }
 
     # Excluded specimens are skipped entirely before any processing.
@@ -156,6 +161,14 @@ def _run_pipeline(image_path):
             image_path, scale_um_per_px, specimen_mask, roi_dims
         )
         result["full_pit_count"] = len(confirmed_pits)
+        result["pit_count"]      = len(confirmed_pits)
+
+        # Per-pit depth stats (major ellipse axis × scale, stored in each pit dict)
+        depths = [p["pit_depth_um"] for p in confirmed_pits if "pit_depth_um" in p]
+        if depths:
+            result["pit_depths_um"]    = depths
+            result["avg_pit_depth_um"] = round(sum(depths) / len(depths), 2)
+            result["max_pit_depth_um"] = round(max(depths), 2)
 
         # Stage 4 — only need the metrics dict; skip debug vis for speed
         density_metrics, _, _, _ = calculate_density(
@@ -164,6 +177,10 @@ def _run_pipeline(image_path):
         result["macro_pit_count"]      = density_metrics["pit_count_macro"]
         result["macro_density_per_cm"] = density_metrics["pit_density_macro_per_cm"]
         result["full_density_per_cm"]  = density_metrics["pit_density_all_per_cm"]
+        # Areal density: convert pits/mm² → pits/cm²  (1 cm² = 100 mm²)
+        result["pit_density_per_cm2"]  = round(
+            density_metrics["areal_all_pits_per_mm2"] * 100.0, 4
+        )
 
     except Exception as exc:
         result["error"] = str(exc)
@@ -307,6 +324,8 @@ def main():
         "roi_width_um", "roi_height_um",
         "macro_pit_count", "macro_density_per_cm",
         "full_pit_count", "full_density_per_cm",
+        "pit_count", "pit_density_per_cm2",
+        "avg_pit_depth_um", "max_pit_depth_um", "pit_depths_um",
         "flagged", "flag_reasons", "error",
     ]
     with open(CSV_OUT, "w", newline="") as fh:
@@ -326,11 +345,38 @@ def main():
                 "macro_density_per_cm": row["macro_density_per_cm"],
                 "full_pit_count":       row["full_pit_count"],
                 "full_density_per_cm":  row["full_density_per_cm"],
+                "pit_count":            row["pit_count"],
+                "pit_density_per_cm2":  row["pit_density_per_cm2"],
+                "avg_pit_depth_um":     row["avg_pit_depth_um"] if row["avg_pit_depth_um"] is not None else "",
+                "max_pit_depth_um":     row["max_pit_depth_um"] if row["max_pit_depth_um"] is not None else "",
+                "pit_depths_um":        "|".join(str(d) for d in row["pit_depths_um"]),
                 "flagged":              "YES" if reasons else "NO",
                 "flag_reasons":         "; ".join(reasons),
                 "error":                row["error"] or "",
             })
     print(f"\nCSV written: {CSV_OUT}")
+
+    # --- Validate new depth/density columns for successful images ----------
+    REQUIRED_COLS = ["pit_count", "pit_density_per_cm2",
+                     "avg_pit_depth_um", "max_pit_depth_um", "pit_depths_um"]
+    validation_errors = []
+    for row in rows:
+        if row.get("excluded") or row.get("no_scale_bar") or row["error"]:
+            continue   # only check images that completed the full pipeline
+        if row["pit_count"] == 0:
+            continue   # zero pits → depth stats legitimately absent
+        for col in REQUIRED_COLS:
+            val = row.get(col)
+            if val is None or val == [] or val == "":
+                validation_errors.append(f"  {row['filename']}: {col} is null/empty")
+    if validation_errors:
+        print("\n  VALIDATION FAILURES (depth/density columns):")
+        for msg in validation_errors:
+            print(msg)
+    else:
+        print(f"  Validation OK — {REQUIRED_COLS} present and non-null "
+              f"for all {len([r for r in rows if not r.get('excluded') and not r.get('no_scale_bar') and not r['error'] and r['pit_count'] > 0])} "
+              f"images with pits.")
 
     # --- Print results table -----------------------------------------------
     print()

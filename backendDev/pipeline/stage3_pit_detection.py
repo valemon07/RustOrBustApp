@@ -178,14 +178,21 @@ def _process_candidate(candidate, pit_type, scale_um_per_px,
     circularity = ((4.0 * math.pi * area_px) / (perimeter ** 2)
                    if perimeter > 0 else 0.0)
 
-    # --- Aspect ratio via ellipse fit (needs ≥ 5 contour points) ----------
+    # --- Aspect ratio and depth via ellipse fit (needs ≥ 5 contour points) --
     if len(contour) >= 5:
         _, (minor_ax, major_ax), _ = cv2.fitEllipse(contour)
-        aspect_ratio = (major_ax / minor_ax
-                        if minor_ax > 0 else float("inf"))
+        # fitEllipse can return NaN/0 on near-degenerate contours; fall back
+        # to bbox in that case so downstream stats stay finite.
+        if math.isfinite(major_ax) and math.isfinite(minor_ax) and minor_ax > 0:
+            aspect_ratio = major_ax / minor_ax
+            pit_depth_um = major_ax * scale_um_per_px
+        else:
+            aspect_ratio = float(max(bw, bh)) / max(min(bw, bh), 1)
+            pit_depth_um = max(bw, bh) * scale_um_per_px
     else:
-        # Fallback: bounding-box ratio
+        # Fallback: bounding-box ratio and longest bbox dimension
         aspect_ratio = float(max(bw, bh)) / max(min(bw, bh), 1)
+        pit_depth_um = max(bw, bh) * scale_um_per_px
 
     # --- Centroid from moments -------------------------------------------
     moments = cv2.moments(contour)
@@ -240,6 +247,7 @@ def _process_candidate(candidate, pit_type, scale_um_per_px,
         "area_um2":        round(area_um2,       2),
         "width_um":        round(bw * scale_um_per_px, 2),
         "height_um":       round(bh * scale_um_per_px, 2),
+        "pit_depth_um":    round(pit_depth_um,   2),
         "aspect_ratio":    round(aspect_ratio,   3),
         "circularity":     round(circularity,    4),
         "mean_intensity":  round(mean_intensity, 2),
