@@ -61,11 +61,11 @@ def _resolve_image_path(primary_rel, fallback_rel):
 
 def _run_stage1(image_path, expected_um):
     try:
-        scale, _ = detect_scale_bar(image_path)
+        scale, _, _ = detect_scale_bar(image_path)
         return scale, "OCR"
     except RuntimeError as exc:
         if "pytesseract" in str(exc) or "µm value" in str(exc):
-            scale, _ = detect_scale_bar(image_path,
+            scale, _, _ = detect_scale_bar(image_path,
                                         um_value_override=expected_um)
             return scale, f"override={expected_um:.0f}µm"
         raise

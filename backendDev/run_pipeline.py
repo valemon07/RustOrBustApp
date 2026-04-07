@@ -27,7 +27,7 @@ CSV_OUT = os.path.join(os.path.dirname(__file__), "outputs", "csv",
 
 def process_image(image_path):
     """Run all 6 stages on a single image and return the result row dict."""
-    scale_um_per_px, _ = detect_scale_bar(image_path)
+    scale_um_per_px, _, _ = detect_scale_bar(image_path)
     roi_mask, _ = extract_roi(image_path)
     pit_contours, _ = detect_pits(image_path, roi_mask)
     metrics, _ = calculate_density(pit_contours, roi_mask, scale_um_per_px)

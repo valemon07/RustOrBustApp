@@ -138,12 +138,13 @@ def _run_pipeline(image_path):
             return result
         um_override = MANUAL_SCALE_OVERRIDES.get(stem)
         try:
-            scale_um_per_px, _ = detect_scale_bar(image_path,
-                                                   um_value_override=um_override)
+            scale_um_per_px, um_value, _ = detect_scale_bar(image_path,
+                                                             um_value_override=um_override)
         except ScaleBarNotFoundError:
             result["no_scale_bar"] = True
             return result
         result["scale_um_per_px"] = scale_um_per_px
+        result["scale_bar_um"]    = um_value
 
         # Stage 2
         specimen_mask, _, roi_dims, _ = extract_roi(image_path, scale_um_per_px)
@@ -173,7 +174,7 @@ def _run_pipeline(image_path):
 def _save_flagged_debug(image_path, flag_tag):
     """Run pipeline again for a flagged image and save the Stage 4 debug vis."""
     try:
-        scale_um_per_px, _ = detect_scale_bar(image_path)
+        scale_um_per_px, _, _ = detect_scale_bar(image_path)
         specimen_mask, _, roi_dims, _ = extract_roi(image_path, scale_um_per_px)
         confirmed_pits, _, _ = detect_pits(
             image_path, scale_um_per_px, specimen_mask, roi_dims
@@ -231,7 +232,7 @@ def _cr3_diagnostic():
 
     # Stage 1 verbose — prints search region, green pixel count, all blobs
     try:
-        scale, _ = detect_scale_bar(path, verbose=True)
+        scale, _, _ = detect_scale_bar(path, verbose=True)
         print(f"  Scale result     : {scale:.4f} µm/px")
     except ScaleBarNotFoundError as exc:
         print(f"  Stage 1 FAILED   : no_scale_bar_found ({exc})")

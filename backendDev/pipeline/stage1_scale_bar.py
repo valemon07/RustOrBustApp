@@ -234,6 +234,9 @@ def detect_scale_bar(image_input, um_value_override=None, verbose=False):
     -------
     scale_um_per_px : float
         Micrometers per pixel derived from the scale bar.
+    um_value : float
+        The µm label read from the scale bar (via OCR or override).
+        Divide scale_um_per_px into this to recover the bar pixel width.
     debug_vis : numpy.ndarray
         BGR image with the detected bar highlighted in red, the measured
         pixel width, and the computed scale factor.
@@ -334,4 +337,4 @@ def detect_scale_bar(image_input, um_value_override=None, verbose=False):
     cv2.rectangle(debug_vis, (roi_x0, roi_y0), (img_w - 1, img_h - 1),
                   (0, 220, 220), 1)
 
-    return scale_um_per_px, debug_vis
+    return scale_um_per_px, float(um_value), debug_vis
