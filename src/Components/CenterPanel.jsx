@@ -1,6 +1,5 @@
 import * as React from "react";
 import "./CenterPanel.css";
-import folderIcon from "/src/assets/folder-open-solid-full.svg";
 import FileUpload from "../lib/FileUpload";
 
 export default function CenterPanel() {

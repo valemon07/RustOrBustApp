@@ -178,9 +178,10 @@ export default function FileUpload({ className }) {
       <img
         src="/src/assets/folder-open-solid-full.svg"
         alt="Folder Icon"
-        style={{ width: "70px", height: "70px", marginBottom: "10px" }}
+        className="upload-icon"
       />
-      <div>Drag and drop files here, or click to browse your computer.</div>
+      <p className="upload-copy">Drop files here or click to browse</p>
+      <p className="upload-subcopy">Supports multiple images and exports one CSV</p>
     </div>
   );
 }
