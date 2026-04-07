@@ -13,10 +13,15 @@ import CenterPanel from './Components/CenterPanel';
 // Defines the App component which will contain the rest of the components in the app.
 const App = () => {
   return (
-    <div>
-      <h1>Welcome to Rust or Bust!</h1>
-      <p>This is the beginning of the Rust or Bust app development.</p>
-      <CenterPanel />
+    <div className="app-shell">
+      <main className="main-stage">
+        <header className="hero-copy">
+          <p className="hero-kicker">Rust or Bust</p>
+          <h1 className="hero-title">Fast Rust Detection Starts Here</h1>
+          <p className="hero-subtitle">Upload one or many images to run analysis and download a single combined CSV.</p>
+        </header>
+        <CenterPanel />
+      </main>
     </div>
   )
 };
