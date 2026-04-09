@@ -86,9 +86,39 @@
   border-color: var(--picker-primary);
 }
 
+.inner-panel.dragging {
+  border-color: var(--picker-primary);
+  background: hsl(18 68% 42% / 0.08);
+}
+
 .outer-panel.dragging .inner-panel {
   border-color: var(--picker-primary);
   background: var(--picker-surface);
+}
+
+.outer-panel.dragging .upload-icon {
+  background: var(--picker-primary);
+  box-shadow: 0 0 0 4px hsl(18 68% 42% / 0.12), 0 2px 6px hsl(220 20% 12% / 0.14);
+}
+
+.outer-panel.dragging .upload-copy {
+  color: var(--picker-primary);
+}
+
+.outer-panel.dragging .upload-subcopy {
+  color: var(--picker-muted);
+}
+
+.outer-panel.dragging .inner-panel::after {
+  content: "Drop to analyze";
+  margin-top: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: hsl(18 68% 42% / 0.1);
+  color: var(--picker-primary);
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .upload-icon {
