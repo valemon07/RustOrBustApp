@@ -1,6 +1,6 @@
 import React from "react";
 
-export default function FileUpload({ className }) {
+export default function FileUpload({ className, isDragging = false }) {
   
   // Function to send files to the backend
   // Takes in a files array, which could be a list of filePaths or Files
@@ -171,7 +171,7 @@ export default function FileUpload({ className }) {
 
   return (
     <div
-      className={className}
+      className={`${className} ${isDragging ? "dragging" : ""}`}
       onClick={clickHandler}
       onDragOver={onDragOver}
       onDrop={onDrop}>
@@ -180,8 +180,10 @@ export default function FileUpload({ className }) {
         alt="Folder Icon"
         className="upload-icon"
       />
-      <p className="upload-copy">Drop files here or click to browse</p>
-      <p className="upload-subcopy">Supports multiple images and exports one CSV</p>
+      <p className="upload-copy">{isDragging ? "Drag here." : "Drop files here or click to browse"}</p>
+      <p className="upload-subcopy">
+        {isDragging ? "Release to start analysis" : "Supports multiple images and exports one CSV"}
+      </p>
     </div>
   );
 }
