@@ -8,21 +8,25 @@ import './app.css';
 import './themes.css';
 import { createRoot } from 'react-dom/client';
 import CenterPanel from './Components/CenterPanel';
+import { ThemeProvider, ThemeSwitcherUI } from './Components/ThemeSwitcher';
 
 
 // Defines the App component which will contain the rest of the components in the app.
 const App = () => {
   return (
-    <div className="app-shell">
-      <main className="main-stage">
-        <header className="hero-copy">
-          <p className="hero-kicker">Rust or Bust</p>
-          <h1 className="hero-title">Fast Rust Detection Starts Here</h1>
-          <p className="hero-subtitle">Upload one or many images to run analysis and download a single combined CSV.</p>
-        </header>
-        <CenterPanel />
-      </main>
-    </div>
+    <ThemeProvider>
+      <div className="app-shell">
+        <main className="main-stage">
+          <header className="hero-copy">
+            <p className="hero-kicker">Rust or Bust</p>
+            <h1 className="hero-title">Fast Image Corrosion Quantification</h1>
+            <p className="hero-subtitle">Upload images to run analysis and receive results</p>
+          </header>
+          <CenterPanel />
+        </main>
+        <ThemeSwitcherUI />
+      </div>
+    </ThemeProvider>
   )
 };
 

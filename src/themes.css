@@ -9,30 +9,25 @@ body.theme-light {
     --picker-radius-sm: 18px;
     --picker-ease: cubic-bezier(0.22, 1, 0.36, 1);
 
-    --app-bg-start: hsl(206 45% 97%);
-    --app-bg-end: hsl(203 56% 95%);
-    --app-orb-a: hsl(198 91% 64% / 0.24);
-    --app-orb-b: hsl(24 100% 62% / 0.22);
-    --app-grid-line: hsl(210 25% 45% / 0.06);
+    --app-bg-start: hsl(220 20% 98%);
+    --app-bg-end: hsl(220 18% 96%);
+    --app-grid-line: hsl(220 12% 84% / 0.25);
 
-    --hero-kicker: hsl(206 72% 36%);
-    --hero-title: hsl(220 35% 16%);
-    --hero-subtitle: hsl(217 18% 35%);
+    --hero-kicker: hsl(220 12% 46%);
+    --hero-title: hsl(220 18% 14%);
+    --hero-subtitle: hsl(220 10% 34%);
 
-    --panel-orb-a: hsl(210 95% 64% / 0.28);
-    --panel-orb-b: hsl(27 95% 60% / 0.2);
-
-    --picker-bg: hsl(204 75% 95%);
-    --picker-bg-soft: hsl(26 80% 95%);
-    --picker-surface: hsl(0 0% 100% / 0.82);
-    --picker-text: hsl(220 34% 16%);
-    --picker-muted: hsl(218 16% 44%);
-    --picker-primary: hsl(211 92% 48%);
-    --picker-accent: hsl(22 94% 56%);
-    --picker-border: hsl(220 28% 24% / 0.1);
-    --picker-focus: hsl(211 92% 48% / 0.2);
-    --picker-shadow: 0 10px 30px hsl(218 25% 15% / 0.1);
-    --picker-shadow-strong: 0 22px 55px hsl(218 25% 15% / 0.18);
+    --picker-bg: hsl(0 0% 100%);
+    --picker-bg-soft: hsl(220 20% 97%);
+    --picker-surface: hsl(0 0% 100%);
+    --picker-text: hsl(220 18% 12%);
+    --picker-muted: hsl(220 8% 42%);
+    --picker-primary: hsl(217 90% 56%);
+    --picker-accent: hsl(24 86% 54%);
+    --picker-border: hsl(220 14% 86%);
+    --picker-focus: hsl(217 90% 56% / 0.16);
+    --picker-shadow: 0 1px 2px hsl(220 20% 12% / 0.10), 0 2px 6px hsl(220 20% 12% / 0.08);
+    --picker-shadow-strong: 0 6px 16px hsl(220 20% 12% / 0.14), 0 2px 4px hsl(220 20% 12% / 0.08);
 }
 
 :root[data-theme="dark"],
@@ -45,30 +40,25 @@ body.theme-dark {
     --picker-radius-sm: 18px;
     --picker-ease: cubic-bezier(0.22, 1, 0.36, 1);
 
-    --app-bg-start: hsl(223 31% 11%);
-    --app-bg-end: hsl(224 35% 8%);
-    --app-orb-a: hsl(199 100% 55% / 0.18);
-    --app-orb-b: hsl(18 100% 58% / 0.16);
-    --app-grid-line: hsl(210 12% 86% / 0.08);
+    --app-bg-start: hsl(220 11% 12%);
+    --app-bg-end: hsl(220 10% 9%);
+    --app-grid-line: hsl(220 8% 84% / 0.07);
 
-    --hero-kicker: hsl(196 100% 74%);
-    --hero-title: hsl(210 28% 95%);
-    --hero-subtitle: hsl(216 24% 77%);
+    --hero-kicker: hsl(220 6% 64%);
+    --hero-title: hsl(220 10% 95%);
+    --hero-subtitle: hsl(220 6% 72%);
 
-    --panel-orb-a: hsl(201 100% 64% / 0.17);
-    --panel-orb-b: hsl(22 100% 63% / 0.14);
-
-    --picker-bg: hsl(224 24% 15%);
-    --picker-bg-soft: hsl(229 22% 13%);
-    --picker-surface: hsl(224 17% 12% / 0.88);
-    --picker-text: hsl(210 30% 95%);
-    --picker-muted: hsl(214 17% 70%);
-    --picker-primary: hsl(198 96% 58%);
-    --picker-accent: hsl(23 96% 59%);
-    --picker-border: hsl(216 23% 89% / 0.14);
-    --picker-focus: hsl(198 96% 58% / 0.24);
-    --picker-shadow: 0 12px 34px hsl(224 42% 3% / 0.5);
-    --picker-shadow-strong: 0 22px 56px hsl(224 42% 3% / 0.65);
+    --picker-bg: hsl(220 8% 15%);
+    --picker-bg-soft: hsl(220 8% 13%);
+    --picker-surface: hsl(220 8% 14%);
+    --picker-text: hsl(220 10% 96%);
+    --picker-muted: hsl(220 6% 72%);
+    --picker-primary: hsl(217 90% 64%);
+    --picker-accent: hsl(220 5% 64%);
+    --picker-border: hsl(220 6% 24%);
+    --picker-focus: hsl(220 8% 74% / 0.16);
+    --picker-shadow: 0 1px 2px hsl(220 20% 0% / 0.38), 0 4px 10px hsl(220 20% 0% / 0.28);
+    --picker-shadow-strong: 0 8px 20px hsl(220 20% 0% / 0.38), 0 2px 4px hsl(220 20% 0% / 0.24);
 }
 
 :root[data-theme="auto"],
@@ -83,29 +73,24 @@ body.theme-auto {
     :root.theme-auto,
     body[data-theme="auto"],
     body.theme-auto {
-        --app-bg-start: hsl(223 31% 11%);
-        --app-bg-end: hsl(224 35% 8%);
-        --app-orb-a: hsl(199 100% 55% / 0.18);
-        --app-orb-b: hsl(18 100% 58% / 0.16);
-        --app-grid-line: hsl(210 12% 86% / 0.08);
+        --app-bg-start: hsl(220 11% 12%);
+        --app-bg-end: hsl(220 10% 9%);
+        --app-grid-line: hsl(220 8% 84% / 0.07);
 
-        --hero-kicker: hsl(196 100% 74%);
-        --hero-title: hsl(210 28% 95%);
-        --hero-subtitle: hsl(216 24% 77%);
+        --hero-kicker: hsl(220 6% 64%);
+        --hero-title: hsl(220 10% 95%);
+        --hero-subtitle: hsl(220 6% 72%);
 
-        --panel-orb-a: hsl(201 100% 64% / 0.17);
-        --panel-orb-b: hsl(22 100% 63% / 0.14);
-
-        --picker-bg: hsl(224 24% 15%);
-        --picker-bg-soft: hsl(229 22% 13%);
-        --picker-surface: hsl(224 17% 12% / 0.88);
-        --picker-text: hsl(210 30% 95%);
-        --picker-muted: hsl(214 17% 70%);
-        --picker-primary: hsl(198 96% 58%);
-        --picker-accent: hsl(23 96% 59%);
-        --picker-border: hsl(216 23% 89% / 0.14);
-        --picker-focus: hsl(198 96% 58% / 0.24);
-        --picker-shadow: 0 12px 34px hsl(224 42% 3% / 0.5);
-        --picker-shadow-strong: 0 22px 56px hsl(224 42% 3% / 0.65);
+        --picker-bg: hsl(220 8% 15%);
+        --picker-bg-soft: hsl(220 8% 13%);
+        --picker-surface: hsl(220 8% 14%);
+        --picker-text: hsl(220 10% 96%);
+        --picker-muted: hsl(220 6% 72%);
+        --picker-primary: hsl(220 8% 74%);
+        --picker-accent: hsl(220 5% 64%);
+        --picker-border: hsl(220 6% 24%);
+        --picker-focus: hsl(220 8% 74% / 0.16);
+        --picker-shadow: 0 1px 2px hsl(220 20% 0% / 0.38), 0 4px 10px hsl(220 20% 0% / 0.28);
+        --picker-shadow-strong: 0 8px 20px hsl(220 20% 0% / 0.38), 0 2px 4px hsl(220 20% 0% / 0.24);
     }
 }

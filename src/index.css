@@ -6,6 +6,16 @@ body,
   margin: 0;
 }
 
+html {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+body {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
 body {
   font-family: "Plus Jakarta Sans", "Segoe UI", "Trebuchet MS", sans-serif;
 }
