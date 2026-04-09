@@ -22,7 +22,8 @@ from pipeline.stage1_scale_bar     import detect_scale_bar
 from pipeline.stage2_roi           import extract_roi
 from pipeline.stage3_pit_detection import (
     detect_pits,
-    MACRO_PIT_AREA_UM2, MIN_PIT_AREA_UM2, MAX_PIT_AREA_UM2,
+    MACRO_PIT_AREA_UM2, MIN_PIT_AREA_UM2,
+    MAX_PIT_AREA_UM2_SURFACE, MAX_PIT_AREA_UM2_EDGE,
     MAX_ASPECT_RATIO, MIN_CIRCULARITY, SCALE_AWARE_AREA_COEFF,
     R6_MIN_COUNT,
     _apply_clahe, _compute_surface_intensity, _process_candidate,

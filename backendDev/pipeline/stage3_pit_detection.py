@@ -53,10 +53,31 @@ CLAHE_CLIP_LIMIT  = 3.0
 CLAHE_TILE_GRID   = (8, 8)
 BLUR_KERNEL_SIZE  = 5
 
-MIN_PIT_AREA_UM2          = 10.0       # R1 — absolute floor (sub-resolution noise)
-MAX_PIT_AREA_UM2          = 50_000.0   # R2 — too large (hole edge)
-MAX_ASPECT_RATIO          = 8.0        # R3 — polishing scratch
-MIN_CIRCULARITY           = 0.08       # R4 — polishing scratch
+MIN_PIT_AREA_UM2               = 10.0       # R1 — absolute floor (sub-resolution noise)
+MAX_PIT_AREA_UM2_SURFACE       = 150_000.0  # R2 — interior pits: raised from 50 k → 150 k
+                                            #      to match edge-pit ceiling and accommodate
+                                            #      large real corrosion features at overview
+                                            #      scale (~4.2 µm/px) where 50 k µm² = only
+                                            #      a 53×53 px region.
+MAX_PIT_AREA_UM2_EDGE          = 150_000.0  # R2 — edge pits: raised ceiling; edge pits
+                                            #      wrap the curved hole boundary and can
+                                            #      span much larger areas than interior pits.
+                                            #      Calibrated against largest observed real
+                                            #      edge pit (53,602 µm²) with ~3× headroom.
+MAX_ASPECT_RATIO               = 8.0        # R3 — polishing scratch
+MIN_CIRCULARITY                = 0.08       # R4 — interior pits only; edge pits are exempt
+                                            #      because their contours wrap the curved hole
+                                            #      boundary, giving inherently low circularity
+                                            #      regardless of pit quality.
+MAX_INTENSITY_RATIO            = 0.92       # R7 — surface pits only: darkness confirmation.
+                                            #      intensity_ratio = mean_pit_intensity /
+                                            #      mean_surface_intensity.  A region that is
+                                            #      brighter than 92 % of the surface mean is
+                                            #      not meaningfully dark — it is surface
+                                            #      variation or a processing artefact, not a
+                                            #      corrosion pit.  Edge pits are exempt because
+                                            #      their illumination mixes specimen surface
+                                            #      with background at the hole boundary.
 # R5 floor derived from minimum physical pit diameter
 # (10 µm) reported in ground truth slides.
 # Floor = π*(d/2)² ≈ 78 µm² at high magnification.
@@ -178,6 +199,11 @@ def _process_candidate(candidate, pit_type, scale_um_per_px,
     circularity = ((4.0 * math.pi * area_px) / (perimeter ** 2)
                    if perimeter > 0 else 0.0)
 
+    # --- Solidity (area / convex hull area) ------------------------------
+    hull      = cv2.convexHull(contour)
+    hull_area = cv2.contourArea(hull)
+    solidity  = area_px / hull_area if hull_area > 0 else 0.0
+
     # --- Aspect ratio and depth via ellipse fit (needs ≥ 5 contour points) --
     if len(contour) >= 5:
         _, (minor_ax, major_ax), _ = cv2.fitEllipse(contour)
@@ -221,17 +247,35 @@ def _process_candidate(candidate, pit_type, scale_um_per_px,
         rejection_reasons.append(
             f"R5:area {area_um2:.2f}µm² < scale-min {effective_min_area_um2:.1f}µm²"
         )
-    if area_um2 > MAX_PIT_AREA_UM2:
+    # R2 — area ceiling: edge pits get a raised cap because their contours wrap
+    # the curved fastener-hole boundary and can span much larger areas than
+    # interior pits without being "too large to be real".
+    max_area = (MAX_PIT_AREA_UM2_EDGE if pit_type == "edge"
+                else MAX_PIT_AREA_UM2_SURFACE)
+    if area_um2 > max_area:
         rejection_reasons.append(
-            f"R2:area {area_um2:.0f}µm² > max {MAX_PIT_AREA_UM2:.0f}µm²"
+            f"R2:area {area_um2:.0f}µm² > max {max_area:.0f}µm²"
         )
     if aspect_ratio > MAX_ASPECT_RATIO:
         rejection_reasons.append(
             f"R3:aspect {aspect_ratio:.2f} > max {MAX_ASPECT_RATIO}"
         )
-    if circularity < MIN_CIRCULARITY:
+    # R4 — circularity: interior pits only.  Edge pits wrap the curved hole
+    # boundary and always have low circularity by geometry, not because they
+    # are noise.  Applying R4 to edge pits would reject real large pits.
+    if pit_type != "edge" and circularity < MIN_CIRCULARITY:
         rejection_reasons.append(
             f"R4:circ {circularity:.4f} < min {MIN_CIRCULARITY}"
+        )
+    # R7 — darkness confirmation: surface pits only.  Real corrosion pits are
+    # distinctly darker than the surrounding polished metal surface.  Candidates
+    # whose mean intensity is close to (≥ 92 %) the surface mean are not dark
+    # enough to be pits — they are surface variation, minor texture, or artefacts
+    # from the morphological closing in Stage 2.  Edge pits are exempt because
+    # they straddle the hole boundary where background bleed-in raises brightness.
+    if pit_type != "edge" and intensity_ratio >= MAX_INTENSITY_RATIO:
+        rejection_reasons.append(
+            f"R7:intensity_ratio {intensity_ratio:.4f} >= max {MAX_INTENSITY_RATIO}"
         )
 
     # Tier assignment: macro = matches human expert scale, micro = sub-expert.
@@ -250,6 +294,7 @@ def _process_candidate(candidate, pit_type, scale_um_per_px,
         "pit_depth_um":    round(pit_depth_um,   2),
         "aspect_ratio":    round(aspect_ratio,   3),
         "circularity":     round(circularity,    4),
+        "solidity":        round(solidity,        4),
         "mean_intensity":  round(mean_intensity, 2),
         "intensity_ratio": round(intensity_ratio, 4),
         "contour":         contour,
@@ -333,7 +378,8 @@ def _build_debug_vis(image, confirmed_pits, rejected_candidates,
 # Public API
 # ---------------------------------------------------------------------------
 
-def detect_pits(image_input, scale_um_per_px, specimen_mask, roi_dims):
+def detect_pits(image_input, scale_um_per_px, specimen_mask, roi_dims,
+                verbose=False):
     """
     Refine Stage 2 candidates into confirmed, measured corrosion pits.
 
@@ -409,6 +455,36 @@ def detect_pits(image_input, scale_um_per_px, specimen_mask, roi_dims):
             rejected_r1_r5.append(result)
         else:
             passed_r1_r5.append(result)
+
+    # --- Verbose rejection log (R1–R5) -----------------------------------
+    if verbose:
+        rejected_large = sorted(
+            [r for r in rejected_r1_r5 if r.get("area_um2", 0) > 0],
+            key=lambda r: r.get("area_um2", 0), reverse=True
+        )
+        print(f"\n  [Stage 3 verbose] scale={scale_um_per_px:.4f} µm/px  "
+              f"effective_min={effective_min_area_um2:.1f} µm²  "
+              f"candidates={len(tagged_candidates)}  "
+              f"passed_R1-R5={len(passed_r1_r5)}  "
+              f"rejected_R1-R5={len(rejected_r1_r5)}")
+        print(f"\n  Rejected candidates (sorted by area, largest first):\n")
+        print(f"  {'#':<4} {'type':<8} {'area_um2':>10} {'aspect':>8} "
+              f"{'circ':>8} {'solid':>7} {'int_r':>6}  reason")
+        print(f"  {'-'*80}")
+        for idx, r in enumerate(rejected_large):
+            print(f"  {idx:<4} {r.get('pit_type','?'):<8} "
+                  f"{r.get('area_um2', 0):>10.1f} "
+                  f"{r.get('aspect_ratio', 0):>8.3f} "
+                  f"{r.get('circularity', 0):>8.4f} "
+                  f"{r.get('solidity', 0):>7.4f} "
+                  f"{r.get('intensity_ratio', 0):>6.3f}  "
+                  + "; ".join(r.get("rejection_reasons", ["?"])))
+        # Also summarise passed candidates
+        if passed_r1_r5:
+            areas = [p["area_um2"] for p in passed_r1_r5]
+            print(f"\n  Passed R1-R5: {len(passed_r1_r5)} candidates  "
+                  f"area range [{min(areas):.1f}, {max(areas):.1f}] µm²")
+        print()
 
     # --- 4. Rule R6: isolation filter -------------------------------------
     # A pit is R6-rejected if it is (a) isolated — no R1-R5 survivor within
