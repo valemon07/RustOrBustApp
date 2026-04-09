@@ -64,26 +64,49 @@ MAX_PIT_AREA_UM2_EDGE          = 150_000.0  # R2 — edge pits: raised ceiling; 
                                             #      span much larger areas than interior pits.
                                             #      Calibrated against largest observed real
                                             #      edge pit (53,602 µm²) with ~3× headroom.
-MAX_ASPECT_RATIO               = 8.0        # R3 — polishing scratch
+MAX_ASPECT_RATIO               = 8.0        # R3 — polishing scratch (small/medium pits)
+MAX_ASPECT_RATIO_LARGE_PIT     = 12.0       # R3 — relaxed for large pits (≥ LARGE_PIT_AREA_UM2)
+                                            #      Large real pits can be elongated without
+                                            #      being scratches; 12.0 still blocks true
+                                            #      polishing streaks.
 MIN_CIRCULARITY                = 0.08       # R4 — interior pits only; edge pits are exempt
                                             #      because their contours wrap the curved hole
                                             #      boundary, giving inherently low circularity
                                             #      regardless of pit quality.
-MAX_INTENSITY_RATIO            = 0.92       # R7 — surface pits only: darkness confirmation.
-                                            #      intensity_ratio = mean_pit_intensity /
-                                            #      mean_surface_intensity.  A region that is
-                                            #      brighter than 92 % of the surface mean is
-                                            #      not meaningfully dark — it is surface
-                                            #      variation or a processing artefact, not a
-                                            #      corrosion pit.  Edge pits are exempt because
-                                            #      their illumination mixes specimen surface
-                                            #      with background at the hole boundary.
+MIN_CIRCULARITY_LARGE_PIT      = 0.04       # R4 — relaxed for large pits (≥ LARGE_PIT_AREA_UM2)
+                                            #      Large real corrosion damage can be
+                                            #      very irregular; 0.04 still excludes
+                                            #      near-linear scratches.
+MAX_INTENSITY_RATIO            = 0.85       # R7 — surface pits only: darkness confirmation.
+                                            #      Tightened from 0.92 → 0.85 because
+                                            #      confirmed real pits never exceed 0.69,
+                                            #      and 0.92 was passing bright surface
+                                            #      scratches as pits. Regions at ≥ 85 % of
+                                            #      the surface mean are not meaningfully dark.
+                                            #      Edge pits are exempt because their
+                                            #      illumination mixes specimen surface with
+                                            #      background at the hole boundary.
 # R5 floor derived from minimum physical pit diameter
 # (10 µm) reported in ground truth slides.
 # Floor = π*(d/2)² ≈ 78 µm² at high magnification.
 # Coefficient 84 gives 80.1 µm² at 1.05 µm/px ≥ π*(5µm)² = 78.5 µm².
 SCALE_AWARE_AREA_COEFF    = 84.0       # R5 — scale-aware micro-pit floor
-                                       #      micro_min = max(10, 84 / scale)
+                                       #      scale_min = max(10, 84 / scale)
+MIN_PIXEL_COUNT           = 15         # R5 — pixel-count floor (overview noise guard)
+                                       #      At overview scale (4.2 µm/px) the
+                                       #      coefficient floor collapses to ~20 µm²
+                                       #      (≈ 1 px²), admitting single-pixel noise.
+                                       #      The pixel floor grows the µm² floor as
+                                       #      scale increases:
+                                       #        15 px × (4.2 µm/px)² = 265 µm²
+                                       #      without affecting high-mag images where
+                                       #        15 px × (1.05 µm/px)² = 16.5 µm²
+                                       #      is dominated by the coefficient term.
+LARGE_PIT_AREA_UM2        = 2000.0     # R3/R4 — area threshold above which relaxed
+                                       #      aspect / circularity limits apply.
+                                       #      Chosen to be above the macro tier (1500 µm²)
+                                       #      so only genuine macro-scale features get
+                                       #      the relaxed limits.
 
 # DOMAIN THRESHOLD — DO NOT CHANGE WITHOUT CLIENT APPROVAL
 # 1500 µm² minimum derived from calibration against human
@@ -172,7 +195,7 @@ def _process_candidate(candidate, pit_type, scale_um_per_px,
     scale_um_per_px        : float
     gray                   : original grayscale image (uint8)
     mean_surface_intensity : float — pre-computed mean of non-pit surface pixels
-    effective_min_area_um2 : float — max(MIN_PIT_AREA_UM2, 50 / scale_um_per_px)
+    effective_min_area_um2 : float — max(MIN_PIT_AREA_UM2, SCALE_AWARE_AREA_COEFF/scale, pixel_floor)
 
     Returns
     -------
@@ -256,16 +279,24 @@ def _process_candidate(candidate, pit_type, scale_um_per_px,
         rejection_reasons.append(
             f"R2:area {area_um2:.0f}µm² > max {max_area:.0f}µm²"
         )
-    if aspect_ratio > MAX_ASPECT_RATIO:
+    # R3 — aspect ratio: large pits can be elongated without being scratches,
+    # so a relaxed ceiling applies when area ≥ LARGE_PIT_AREA_UM2.
+    aspect_ceiling = (MAX_ASPECT_RATIO_LARGE_PIT if area_um2 >= LARGE_PIT_AREA_UM2
+                      else MAX_ASPECT_RATIO)
+    if aspect_ratio > aspect_ceiling:
         rejection_reasons.append(
-            f"R3:aspect {aspect_ratio:.2f} > max {MAX_ASPECT_RATIO}"
+            f"R3:aspect {aspect_ratio:.2f} > max {aspect_ceiling}"
         )
     # R4 — circularity: interior pits only.  Edge pits wrap the curved hole
     # boundary and always have low circularity by geometry, not because they
     # are noise.  Applying R4 to edge pits would reject real large pits.
-    if pit_type != "edge" and circularity < MIN_CIRCULARITY:
+    # Large surface pits can be very irregular; a relaxed floor applies when
+    # area ≥ LARGE_PIT_AREA_UM2 to avoid discarding genuine macro damage.
+    circ_floor = (MIN_CIRCULARITY_LARGE_PIT if area_um2 >= LARGE_PIT_AREA_UM2
+                  else MIN_CIRCULARITY)
+    if pit_type != "edge" and circularity < circ_floor:
         rejection_reasons.append(
-            f"R4:circ {circularity:.4f} < min {MIN_CIRCULARITY}"
+            f"R4:circ {circularity:.4f} < min {circ_floor}"
         )
     # R7 — darkness confirmation: surface pits only.  Real corrosion pits are
     # distinctly darker than the surrounding polished metal surface.  Candidates
@@ -435,8 +466,13 @@ def detect_pits(image_input, scale_um_per_px, specimen_mask, roi_dims,
     # --- 3. Rules R1–R5: per-candidate geometric filters -------------------
     # R5 scale-aware floor: effective minimum grows as magnification increases
     # (smaller µm/px → finer resolution → more noise features resolved).
+    # Pixel floor: MIN_PIXEL_COUNT × scale² prevents single-pixel noise blobs
+    # from surviving at low magnification (large scale_um_per_px) where the
+    # coefficient floor alone collapses to near-zero µm².
+    pixel_floor_um2 = MIN_PIXEL_COUNT * (scale_um_per_px ** 2)
     effective_min_area_um2 = max(MIN_PIT_AREA_UM2,
-                                 SCALE_AWARE_AREA_COEFF / scale_um_per_px)
+                                 SCALE_AWARE_AREA_COEFF / scale_um_per_px,
+                                 pixel_floor_um2)
 
     tagged_candidates = (
         [(c, "edge")    for c in roi_dims["edge_pits"]] +

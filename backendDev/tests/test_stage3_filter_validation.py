@@ -53,8 +53,11 @@ from pipeline.stage2_roi           import extract_roi
 from pipeline.stage3_pit_detection import (
     detect_pits,
     MIN_PIT_AREA_UM2, MAX_PIT_AREA_UM2_SURFACE, MAX_PIT_AREA_UM2_EDGE,
-    MAX_ASPECT_RATIO, MIN_CIRCULARITY, MAX_INTENSITY_RATIO,
-    SCALE_AWARE_AREA_COEFF, MACRO_PIT_AREA_UM2,
+    MAX_ASPECT_RATIO, MAX_ASPECT_RATIO_LARGE_PIT,
+    MIN_CIRCULARITY, MIN_CIRCULARITY_LARGE_PIT,
+    MAX_INTENSITY_RATIO,
+    SCALE_AWARE_AREA_COEFF, MIN_PIXEL_COUNT, LARGE_PIT_AREA_UM2,
+    MACRO_PIT_AREA_UM2,
 )
 from pipeline.config import MANUAL_SCALE_OVERRIDES
 
@@ -97,6 +100,13 @@ def _run_one(filename):
     return scale, confirmed, rejected
 
 
+# Tolerance for area comparisons in the invariant check.
+# area_um2 is stored rounded to 2 dp; eff_min is recomputed with full float
+# precision, so a pit exactly at the floor can round to a value ≤ 0.005 µm²
+# below the recomputed threshold.  _AREA_EPSILON prevents false failures.
+_AREA_EPSILON = 0.01
+
+
 def _invariant_violations(pit, scale, pit_type):
     """
     Return list of invariant violation strings for a CONFIRMED pit.
@@ -107,18 +117,23 @@ def _invariant_violations(pit, scale, pit_type):
     aspect     = pit.get("aspect_ratio", 0)
     circ       = pit.get("circularity", 0)
     ir         = pit.get("intensity_ratio", 0)
-    eff_min    = max(MIN_PIT_AREA_UM2, SCALE_AWARE_AREA_COEFF / scale)
+    pixel_floor = MIN_PIXEL_COUNT * (scale ** 2)
+    eff_min    = max(MIN_PIT_AREA_UM2, SCALE_AWARE_AREA_COEFF / scale, pixel_floor)
     max_area   = (MAX_PIT_AREA_UM2_EDGE if pit_type == "edge"
                   else MAX_PIT_AREA_UM2_SURFACE)
+    aspect_ceil = (MAX_ASPECT_RATIO_LARGE_PIT if area >= LARGE_PIT_AREA_UM2
+                   else MAX_ASPECT_RATIO)
+    circ_floor  = (MIN_CIRCULARITY_LARGE_PIT if area >= LARGE_PIT_AREA_UM2
+                   else MIN_CIRCULARITY)
 
-    if area < eff_min:
+    if area < eff_min - _AREA_EPSILON:
         violations.append(f"R1/R5:area {area:.1f} < {eff_min:.1f}")
     if area > max_area:
         violations.append(f"R2:area {area:.1f} > {max_area:.1f}")
-    if aspect > MAX_ASPECT_RATIO:
-        violations.append(f"R3:aspect {aspect:.2f} > {MAX_ASPECT_RATIO}")
-    if pit_type != "edge" and circ < MIN_CIRCULARITY:
-        violations.append(f"R4:circ {circ:.4f} < {MIN_CIRCULARITY}")
+    if aspect > aspect_ceil:
+        violations.append(f"R3:aspect {aspect:.2f} > {aspect_ceil}")
+    if pit_type != "edge" and circ < circ_floor:
+        violations.append(f"R4:circ {circ:.4f} < {circ_floor}")
     if pit_type != "edge" and ir >= MAX_INTENSITY_RATIO:
         violations.append(f"R7:intensity_ratio {ir:.4f} >= {MAX_INTENSITY_RATIO}")
     return violations
@@ -133,23 +148,28 @@ def _borderline(pit, scale, pit_type):
     aspect = pit.get("aspect_ratio", 0)
     circ   = pit.get("circularity", 0)
     ir     = pit.get("intensity_ratio", 0)
-    eff_min = max(MIN_PIT_AREA_UM2, SCALE_AWARE_AREA_COEFF / scale)
+    pixel_floor = MIN_PIXEL_COUNT * (scale ** 2)
+    eff_min = max(MIN_PIT_AREA_UM2, SCALE_AWARE_AREA_COEFF / scale, pixel_floor)
     max_area = (MAX_PIT_AREA_UM2_EDGE if pit_type == "edge"
                 else MAX_PIT_AREA_UM2_SURFACE)
+    aspect_ceil = (MAX_ASPECT_RATIO_LARGE_PIT if area >= LARGE_PIT_AREA_UM2
+                   else MAX_ASPECT_RATIO)
+    circ_floor  = (MIN_CIRCULARITY_LARGE_PIT if area >= LARGE_PIT_AREA_UM2
+                   else MIN_CIRCULARITY)
 
-    # Area floor
-    if area > 0 and abs(area - eff_min) / eff_min < BORDER_MARGIN:
+    # Area floor — skip pits exactly at the floor (floating-point boundary)
+    if area > eff_min - _AREA_EPSILON and abs(area - eff_min) / eff_min < BORDER_MARGIN:
         flags.append(f"near-R5-floor ({area:.1f} vs {eff_min:.1f})")
     # Area ceiling
     if abs(area - max_area) / max_area < BORDER_MARGIN:
         flags.append(f"near-R2-ceiling ({area:.1f} vs {max_area:.1f})")
     # Aspect
-    if aspect > 0 and abs(aspect - MAX_ASPECT_RATIO) / MAX_ASPECT_RATIO < BORDER_MARGIN:
-        flags.append(f"near-R3-aspect ({aspect:.2f} vs {MAX_ASPECT_RATIO})")
+    if aspect > 0 and abs(aspect - aspect_ceil) / aspect_ceil < BORDER_MARGIN:
+        flags.append(f"near-R3-aspect ({aspect:.2f} vs {aspect_ceil})")
     # Circularity (surface only)
     if pit_type != "edge" and circ > 0:
-        if abs(circ - MIN_CIRCULARITY) / MIN_CIRCULARITY < BORDER_MARGIN:
-            flags.append(f"near-R4-circ ({circ:.4f} vs {MIN_CIRCULARITY})")
+        if abs(circ - circ_floor) / circ_floor < BORDER_MARGIN:
+            flags.append(f"near-R4-circ ({circ:.4f} vs {circ_floor})")
     # Intensity ratio (surface only)
     if pit_type != "edge":
         if abs(ir - MAX_INTENSITY_RATIO) / MAX_INTENSITY_RATIO < BORDER_MARGIN:
@@ -167,9 +187,11 @@ def main():
     print(f"\n{'='*78}")
     print(f"  Stage 3 Filter Validation")
     print(f"  R2 surface ceiling : {MAX_PIT_AREA_UM2_SURFACE:,.0f} µm²")
-    print(f"  R7 intensity ratio : < {MAX_INTENSITY_RATIO}")
-    print(f"  R4 circularity     : >= {MIN_CIRCULARITY}  (surface pits only)")
-    print(f"  R3 aspect ratio    : <= {MAX_ASPECT_RATIO}")
+    print(f"  R7 intensity ratio : < {MAX_INTENSITY_RATIO}  (tightened from 0.92)")
+    print(f"  R4 circularity     : >= {MIN_CIRCULARITY}  (surface pits only; "
+          f">= {MIN_CIRCULARITY_LARGE_PIT} for area >= {LARGE_PIT_AREA_UM2:.0f} µm²)")
+    print(f"  R3 aspect ratio    : <= {MAX_ASPECT_RATIO}  "
+          f"(<= {MAX_ASPECT_RATIO_LARGE_PIT} for area >= {LARGE_PIT_AREA_UM2:.0f} µm²)")
     print(f"{'='*78}\n")
 
     global_rule_counts = {}
@@ -195,9 +217,11 @@ def main():
         macro_pits   = [p for p in confirmed if p.get("pit_tier") == "macro"]
         surface_conf = [p for p in confirmed if p["pit_type"] == "surface"]
         edge_conf    = [p for p in confirmed if p["pit_type"] == "edge"]
-        eff_min      = max(MIN_PIT_AREA_UM2, SCALE_AWARE_AREA_COEFF / scale)
+        pixel_floor  = MIN_PIXEL_COUNT * (scale ** 2)
+        eff_min      = max(MIN_PIT_AREA_UM2, SCALE_AWARE_AREA_COEFF / scale, pixel_floor)
 
-        print(f"\n  scale={scale:.4f} µm/px  eff_min_area={eff_min:.1f} µm²")
+        print(f"\n  scale={scale:.4f} µm/px  eff_min_area={eff_min:.1f} µm²  "
+              f"(pixel_floor={pixel_floor:.1f})")
         print(f"  confirmed={len(confirmed)} "
               f"(macro={len(macro_pits)} micro={len(confirmed)-len(macro_pits)})  "
               f"surface={len(surface_conf)}  edge={len(edge_conf)}")

@@ -125,6 +125,13 @@ def _run_pipeline(image_path):
         "avg_pit_depth_um":     None,
         "max_pit_depth_um":     None,
         "pit_depths_um":        [],
+        "rejected_R1":          0,
+        "rejected_R2":          0,
+        "rejected_R3":          0,
+        "rejected_R4":          0,
+        "rejected_R5":          0,
+        "rejected_R6":          0,
+        "rejected_R7":          0,
         "no_scale_bar":         False,
         "excluded":             False,
         "error":                None,
@@ -157,7 +164,7 @@ def _run_pipeline(image_path):
         result["roi_height_um"] = roi_dims["height_um"]
 
         # Stage 3
-        confirmed_pits, _, _ = detect_pits(
+        confirmed_pits, rejected_candidates, _ = detect_pits(
             image_path, scale_um_per_px, specimen_mask, roi_dims
         )
         result["full_pit_count"] = len(confirmed_pits)
@@ -169,6 +176,15 @@ def _run_pipeline(image_path):
             result["pit_depths_um"]    = depths
             result["avg_pit_depth_um"] = round(sum(depths) / len(depths), 2)
             result["max_pit_depth_um"] = round(max(depths), 2)
+
+        # Per-rule rejection counts — parse the first token of each reason string
+        # e.g. "R3:aspect 9.1 > max 8.0" → key "R3"
+        for rejected in rejected_candidates:
+            for reason in rejected.get("rejection_reasons", []):
+                key = reason.split(":")[0].strip()   # "R1" … "R7"
+                col = f"rejected_{key}"
+                if col in result:
+                    result[col] += 1
 
         # Stage 4 — only need the metrics dict; skip debug vis for speed
         density_metrics, _, _, _ = calculate_density(
@@ -326,6 +342,8 @@ def main():
         "full_pit_count", "full_density_per_cm",
         "pit_count", "pit_density_per_cm2",
         "avg_pit_depth_um", "max_pit_depth_um", "pit_depths_um",
+        "rejected_R1", "rejected_R2", "rejected_R3", "rejected_R4",
+        "rejected_R5", "rejected_R6", "rejected_R7",
         "flagged", "flag_reasons", "error",
     ]
     with open(CSV_OUT, "w", newline="") as fh:
@@ -350,6 +368,13 @@ def main():
                 "avg_pit_depth_um":     row["avg_pit_depth_um"] if row["avg_pit_depth_um"] is not None else "",
                 "max_pit_depth_um":     row["max_pit_depth_um"] if row["max_pit_depth_um"] is not None else "",
                 "pit_depths_um":        "|".join(str(d) for d in row["pit_depths_um"]),
+                "rejected_R1":          row["rejected_R1"],
+                "rejected_R2":          row["rejected_R2"],
+                "rejected_R3":          row["rejected_R3"],
+                "rejected_R4":          row["rejected_R4"],
+                "rejected_R5":          row["rejected_R5"],
+                "rejected_R6":          row["rejected_R6"],
+                "rejected_R7":          row["rejected_R7"],
                 "flagged":              "YES" if reasons else "NO",
                 "flag_reasons":         "; ".join(reasons),
                 "error":                row["error"] or "",
