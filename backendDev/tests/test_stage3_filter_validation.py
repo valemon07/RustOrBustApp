@@ -52,10 +52,16 @@ from pipeline.stage1_scale_bar     import detect_scale_bar, ScaleBarNotFoundErro
 from pipeline.stage2_roi           import extract_roi
 from pipeline.stage3_pit_detection import (
     detect_pits,
+    _compute_dominant_orientation,
     MIN_PIT_AREA_UM2, MAX_PIT_AREA_UM2_SURFACE, MAX_PIT_AREA_UM2_EDGE,
-    MAX_ASPECT_RATIO, MAX_ASPECT_RATIO_LARGE_PIT,
+    MAX_PIT_AREA_UM2_RECLASSIFIED,
+    MAX_ASPECT_RATIO, MAX_ASPECT_RATIO_LARGE_PIT, MAX_ASPECT_RATIO_COARSE,
     MIN_CIRCULARITY, MIN_CIRCULARITY_LARGE_PIT,
-    MAX_INTENSITY_RATIO,
+    MAX_INTENSITY_RATIO, MAX_INTENSITY_RATIO_COARSE,
+    R3_SCALE_BREAKPOINT_HIGH,
+    R7_SCALE_BREAKPOINT_LOW, R7_SCALE_BREAKPOINT_HIGH,
+    R8_ANGLE_TOLERANCE_DEG, R8_MIN_ASPECT_RATIO, R8_MAX_AREA_UM2,
+    R8_ORIENTATION_ENTROPY_MAX,
     SCALE_AWARE_AREA_COEFF, MIN_PIXEL_COUNT, LARGE_PIT_AREA_UM2,
     MACRO_PIT_AREA_UM2,
 )
@@ -84,10 +90,35 @@ BORDER_MARGIN = 0.15   # flag pits within ±15 % of a threshold boundary
 
 
 # ---------------------------------------------------------------------------
+# Scale-adaptive threshold helpers (mirror logic in stage3_pit_detection)
+# ---------------------------------------------------------------------------
+
+def _effective_r3_ceiling(scale, area_um2):
+    """Return the R3 aspect-ratio ceiling for the given scale and area."""
+    if area_um2 >= LARGE_PIT_AREA_UM2:
+        return MAX_ASPECT_RATIO_LARGE_PIT
+    if scale > R3_SCALE_BREAKPOINT_HIGH:
+        return MAX_ASPECT_RATIO_COARSE
+    return MAX_ASPECT_RATIO
+
+
+def _effective_r7_threshold(scale):
+    """Return the R7 intensity-ratio ceiling for the given scale."""
+    if scale <= R7_SCALE_BREAKPOINT_LOW:
+        return MAX_INTENSITY_RATIO
+    if scale >= R7_SCALE_BREAKPOINT_HIGH:
+        return MAX_INTENSITY_RATIO_COARSE
+    t = ((scale - R7_SCALE_BREAKPOINT_LOW) /
+         (R7_SCALE_BREAKPOINT_HIGH - R7_SCALE_BREAKPOINT_LOW))
+    return MAX_INTENSITY_RATIO + t * (MAX_INTENSITY_RATIO_COARSE - MAX_INTENSITY_RATIO)
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 def _run_one(filename):
+    import cv2 as _cv2
     path  = os.path.join(RAW_DIR, filename)
     stem  = os.path.splitext(filename)[0]
     um_override = MANUAL_SCALE_OVERRIDES.get(stem)
@@ -97,7 +128,8 @@ def _run_one(filename):
     confirmed, rejected, _ = detect_pits(
         path, scale, specimen_mask, roi_dims
     )
-    return scale, confirmed, rejected
+    gray = _cv2.cvtColor(_cv2.imread(path), _cv2.COLOR_BGR2GRAY)
+    return scale, confirmed, rejected, gray, specimen_mask
 
 
 # Tolerance for area comparisons in the invariant check.
@@ -119,12 +151,16 @@ def _invariant_violations(pit, scale, pit_type):
     ir         = pit.get("intensity_ratio", 0)
     pixel_floor = MIN_PIXEL_COUNT * (scale ** 2)
     eff_min    = max(MIN_PIT_AREA_UM2, SCALE_AWARE_AREA_COEFF / scale, pixel_floor)
-    max_area   = (MAX_PIT_AREA_UM2_EDGE if pit_type == "edge"
-                  else MAX_PIT_AREA_UM2_SURFACE)
-    aspect_ceil = (MAX_ASPECT_RATIO_LARGE_PIT if area >= LARGE_PIT_AREA_UM2
-                   else MAX_ASPECT_RATIO)
-    circ_floor  = (MIN_CIRCULARITY_LARGE_PIT if area >= LARGE_PIT_AREA_UM2
-                   else MIN_CIRCULARITY)
+    if pit_type == "edge":
+        max_area = MAX_PIT_AREA_UM2_EDGE
+    elif pit.get("reclassified_from_edge"):
+        max_area = MAX_PIT_AREA_UM2_RECLASSIFIED
+    else:
+        max_area = MAX_PIT_AREA_UM2_SURFACE
+    aspect_ceil  = _effective_r3_ceiling(scale, area)
+    circ_floor   = (MIN_CIRCULARITY_LARGE_PIT if area >= LARGE_PIT_AREA_UM2
+                    else MIN_CIRCULARITY)
+    r7_threshold = _effective_r7_threshold(scale)
 
     if area < eff_min - _AREA_EPSILON:
         violations.append(f"R1/R5:area {area:.1f} < {eff_min:.1f}")
@@ -134,8 +170,8 @@ def _invariant_violations(pit, scale, pit_type):
         violations.append(f"R3:aspect {aspect:.2f} > {aspect_ceil}")
     if pit_type != "edge" and circ < circ_floor:
         violations.append(f"R4:circ {circ:.4f} < {circ_floor}")
-    if pit_type != "edge" and ir >= MAX_INTENSITY_RATIO:
-        violations.append(f"R7:intensity_ratio {ir:.4f} >= {MAX_INTENSITY_RATIO}")
+    if pit_type != "edge" and ir >= r7_threshold:
+        violations.append(f"R7:intensity_ratio {ir:.4f} >= {r7_threshold:.3f}")
     return violations
 
 
@@ -150,12 +186,16 @@ def _borderline(pit, scale, pit_type):
     ir     = pit.get("intensity_ratio", 0)
     pixel_floor = MIN_PIXEL_COUNT * (scale ** 2)
     eff_min = max(MIN_PIT_AREA_UM2, SCALE_AWARE_AREA_COEFF / scale, pixel_floor)
-    max_area = (MAX_PIT_AREA_UM2_EDGE if pit_type == "edge"
-                else MAX_PIT_AREA_UM2_SURFACE)
-    aspect_ceil = (MAX_ASPECT_RATIO_LARGE_PIT if area >= LARGE_PIT_AREA_UM2
-                   else MAX_ASPECT_RATIO)
-    circ_floor  = (MIN_CIRCULARITY_LARGE_PIT if area >= LARGE_PIT_AREA_UM2
-                   else MIN_CIRCULARITY)
+    if pit_type == "edge":
+        max_area = MAX_PIT_AREA_UM2_EDGE
+    elif pit.get("reclassified_from_edge"):
+        max_area = MAX_PIT_AREA_UM2_RECLASSIFIED
+    else:
+        max_area = MAX_PIT_AREA_UM2_SURFACE
+    aspect_ceil  = _effective_r3_ceiling(scale, area)
+    circ_floor   = (MIN_CIRCULARITY_LARGE_PIT if area >= LARGE_PIT_AREA_UM2
+                    else MIN_CIRCULARITY)
+    r7_threshold = _effective_r7_threshold(scale)
 
     # Area floor — skip pits exactly at the floor (floating-point boundary)
     if area > eff_min - _AREA_EPSILON and abs(area - eff_min) / eff_min < BORDER_MARGIN:
@@ -170,10 +210,10 @@ def _borderline(pit, scale, pit_type):
     if pit_type != "edge" and circ > 0:
         if abs(circ - circ_floor) / circ_floor < BORDER_MARGIN:
             flags.append(f"near-R4-circ ({circ:.4f} vs {circ_floor})")
-    # Intensity ratio (surface only)
+    # Intensity ratio (surface only) — use scale-adaptive threshold
     if pit_type != "edge":
-        if abs(ir - MAX_INTENSITY_RATIO) / MAX_INTENSITY_RATIO < BORDER_MARGIN:
-            flags.append(f"near-R7-intensity ({ir:.4f} vs {MAX_INTENSITY_RATIO})")
+        if abs(ir - r7_threshold) / r7_threshold < BORDER_MARGIN:
+            flags.append(f"near-R7-intensity ({ir:.4f} vs {r7_threshold:.3f})")
     return flags
 
 
@@ -187,11 +227,18 @@ def main():
     print(f"\n{'='*78}")
     print(f"  Stage 3 Filter Validation")
     print(f"  R2 surface ceiling : {MAX_PIT_AREA_UM2_SURFACE:,.0f} µm²")
-    print(f"  R7 intensity ratio : < {MAX_INTENSITY_RATIO}  (tightened from 0.92)")
     print(f"  R4 circularity     : >= {MIN_CIRCULARITY}  (surface pits only; "
           f">= {MIN_CIRCULARITY_LARGE_PIT} for area >= {LARGE_PIT_AREA_UM2:.0f} µm²)")
-    print(f"  R3 aspect ratio    : <= {MAX_ASPECT_RATIO}  "
-          f"(<= {MAX_ASPECT_RATIO_LARGE_PIT} for area >= {LARGE_PIT_AREA_UM2:.0f} µm²)")
+    print(f"  R8 scratch filter  : ±{R8_ANGLE_TOLERANCE_DEG:.0f}°  "
+          f"aspect>{R8_MIN_ASPECT_RATIO}  area<{R8_MAX_AREA_UM2:.0f} µm²  "
+          f"entropy_max={R8_ORIENTATION_ENTROPY_MAX}")
+    print(f"\n  Scale-adaptive threshold audit:")
+    print(f"  {'scale µm/px':>12}  {'R3 small pit':>14}  {'R3 large pit':>14}  {'R7 threshold':>14}")
+    for s in [1.0, 2.0, 4.0, 6.0]:
+        r3s = _effective_r3_ceiling(s, 0.0)          # area=0 → small pit branch
+        r3l = _effective_r3_ceiling(s, LARGE_PIT_AREA_UM2)  # large pit branch
+        r7  = _effective_r7_threshold(s)
+        print(f"  {s:>12.1f}  {r3s:>14.1f}  {r3l:>14.1f}  {r7:>14.3f}")
     print(f"{'='*78}\n")
 
     global_rule_counts = {}
@@ -208,7 +255,7 @@ def main():
             continue
 
         try:
-            scale, confirmed, rejected = _run_one(filename)
+            scale, confirmed, rejected, _gray, _mask = _run_one(filename)
         except Exception as exc:
             print(f"  ERROR — {exc}\n")
             all_passed = False
@@ -281,7 +328,16 @@ def main():
                                                    key=lambda x: x[2], reverse=True)[:8]:
                 print(f"    pit#{pid} ({ptype}, {area:.1f} µm²): {'; '.join(flags)}")
 
-        # --- 5. Rejection rule breakdown ----------------------------------
+        # --- 5a. R8 dominant-orientation stats ----------------------------
+        dom_angle, dom_entropy = _compute_dominant_orientation(_gray, _mask)
+        r8_active = dom_entropy <= R8_ORIENTATION_ENTROPY_MAX
+        if r8_active:
+            r8_note = f"dominant={dom_angle:.1f}°  entropy={dom_entropy:.2f} bits"
+        else:
+            r8_note = f"SKIPPED (entropy={dom_entropy:.2f} > {R8_ORIENTATION_ENTROPY_MAX})"
+        print(f"\n  R8 orientation: {r8_note}")
+
+        # --- 5b. Rejection rule breakdown ----------------------------------
         rule_counts = {}
         for r in rejected:
             for reason in r.get("rejection_reasons", []):
@@ -290,8 +346,10 @@ def main():
                 global_rule_counts[key] = global_rule_counts.get(key, 0) + 1
         print(f"\n  Rejection breakdown:")
         for rule, count in sorted(rule_counts.items()):
-            r7_note = "  ← noise filter" if rule == "R7" else ""
-            print(f"    {rule}: {count}{r7_note}")
+            note = ("  ← noise filter" if rule == "R7"
+                    else "  ← scratch-orientation filter" if rule == "R8"
+                    else "")
+            print(f"    {rule}: {count}{note}")
 
         print()
 
