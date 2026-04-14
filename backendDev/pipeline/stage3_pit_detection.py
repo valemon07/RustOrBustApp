@@ -87,6 +87,13 @@ MIN_CIRCULARITY_LARGE_PIT      = 0.04       # R4 — relaxed for large pits (≥
                                             #      Large real corrosion damage can be
                                             #      very irregular; 0.04 still excludes
                                             #      near-linear scratches.
+MIN_CIRCULARITY_FINE           = 0.12       # R4 — tighter floor for small pits at fine scale
+                                            #      (< R4_SCALE_BREAKPOINT µm/px).  At fine scale
+                                            #      real pits are well-resolved and appear rounder;
+                                            #      noise features (grain-boundary patches, scratch-
+                                            #      intersection blobs) tend to have circularity
+                                            #      0.05–0.10 and are caught by this higher floor.
+R4_SCALE_BREAKPOINT            = 1.5        # µm/px; below this, MIN_CIRCULARITY_FINE applies
 MAX_INTENSITY_RATIO            = 0.85       # R7 — surface pits only: darkness confirmation.
                                             #      Tightened from 0.92 → 0.85 because
                                             #      confirmed real pits never exceed 0.69,
@@ -102,16 +109,25 @@ MAX_INTENSITY_RATIO            = 0.85       # R7 — surface pits only: darkness
 # Coefficient 84 gives 80.1 µm² at 1.05 µm/px ≥ π*(5µm)² = 78.5 µm².
 SCALE_AWARE_AREA_COEFF    = 84.0       # R5 — scale-aware micro-pit floor
                                        #      scale_min = max(10, 84 / scale)
-MIN_PIXEL_COUNT           = 15         # R5 — pixel-count floor (overview noise guard)
-                                       #      At overview scale (4.2 µm/px) the
-                                       #      coefficient floor collapses to ~20 µm²
-                                       #      (≈ 1 px²), admitting single-pixel noise.
-                                       #      The pixel floor grows the µm² floor as
-                                       #      scale increases:
-                                       #        15 px × (4.2 µm/px)² = 265 µm²
-                                       #      without affecting high-mag images where
-                                       #        15 px × (1.05 µm/px)² = 16.5 µm²
-                                       #      is dominated by the coefficient term.
+R5_PHYSICAL_MIN_AREA_UM2  = 78.5       # R5 — hard physical floor: π × (5 µm)² = 78.5 µm²
+                                       #      Enforces the 10 µm minimum pit diameter at ALL
+                                       #      scales.  Without this, the formula
+                                       #      max(84/scale, 15×scale²) hits a valley of ~47 µm²
+                                       #      at scale ≈ 1.77 µm/px — below the physical min.
+MIN_PIXEL_COUNT           = 15         # R5 — pixel-count floor, fine/medium scale
+                                       #      (scale < R5_COARSE_BREAKPOINT)
+                                       #        15 px × (1.05 µm/px)² = 16.5 µm²  (fine)
+                                       #        15 px × (3.1 µm/px)²  = 144 µm²   (medium)
+                                       #      dominated by the coefficient term at fine scale.
+MIN_PIXEL_COUNT_COARSE    = 25         # R5 — tighter pixel-count floor at coarse scale
+                                       #      (scale ≥ R5_COARSE_BREAKPOINT).
+                                       #      At coarse scale polishing scratches merge into
+                                       #      compact dark zones large enough to pass the
+                                       #      fine-scale floor.  Raising to 25 px pushes the
+                                       #      floor up without disrupting fine-scale detection:
+                                       #        25 px × (4.2 µm/px)² = 441 µm²   (4.2 µm/px)
+                                       #        25 px × (6.0 µm/px)² = 900 µm²   (6.0 µm/px)
+R5_COARSE_BREAKPOINT      = 4.0        # µm/px; above this, MIN_PIXEL_COUNT_COARSE applies
 LARGE_PIT_AREA_UM2        = 2000.0     # R3/R4 — area threshold above which relaxed
                                        #      aspect / circularity limits apply.
                                        #      Chosen to be above the macro tier (1500 µm²)
@@ -130,6 +146,14 @@ MACRO_PIT_AREA_UM2        = 1500.0     # tier boundary: macro vs micro pit
 
 R6_MIN_COUNT              = 10         # R6 — don't apply isolation filter when
                                        #      fewer than this many pits survive R1-R5
+R6_ISOLATION_DISTANCE_UM  = 200.0      # R6 — physical isolation radius in µm.
+                                       #      A pit with no neighbour within this distance
+                                       #      is considered isolated.  Expressed in µm so
+                                       #      the test is scale-invariant (was previously
+                                       #      a fixed 200 px, which meant 840 µm at 4.2
+                                       #      µm/px — effectively disabling R6 at coarse
+                                       #      scale).  Convert to px at run time:
+                                       #        threshold_px = 200 µm / scale_um_per_px
 
 # Mirror stage2 constants so we can draw the scale-bar zone in debug output
 # without importing from stage2 (avoids circular / fragile cross-module deps).
@@ -156,18 +180,29 @@ EDGE_RECLASSIFY_BOUNDARY_FRACTION = 0.60
 # R8 is skipped entirely when the orientation entropy exceeds
 # R8_ORIENTATION_ENTROPY_MAX — this indicates isotropic texture (no dominant
 # scratch direction) and avoids false rejections on pit-only images.
-R8_ANGLE_TOLERANCE_DEG     = 15.0   # ±15° alignment window; raise to ~20° if under-rejecting
-R8_MIN_ASPECT_RATIO        = 3.0    # only applied to elongated candidates
-R8_MAX_AREA_UM2            = 5000.0 # large pits (real coalesced damage) are exempt
-R8_ORIENTATION_ENTROPY_MAX = 2.5    # bits; above this, skip R8 (isotropic texture)
+R8_ANGLE_TOLERANCE_DEG     = 15.0    # ±15° alignment window; raise to ~20° if under-rejecting
+R8_MIN_ASPECT_RATIO        = 3.0     # only applied to elongated candidates
+R8_MAX_AREA_UM2_FINE       = 3000.0  # scratch cap for scale < 1.5 µm/px: fine-scale scratch
+                                     # segments are small; reduce cap to catch more of them
+                                     # before they grow to 5 k µm²
+R8_MAX_AREA_UM2_MEDIUM     = 5000.0  # scratch cap for 1.5 ≤ scale < 4.0 µm/px (original value)
+R8_MAX_AREA_UM2_COARSE     = 15000.0 # scratch cap for scale ≥ 4.0 µm/px: at coarse scale,
+                                     # entire scratch-zone clusters merge into single large
+                                     # elongated blobs (5 k–20 k µm²); raise cap to catch them
+R8_SCALE_BREAKPOINT        = 1.5     # µm/px boundary between fine and medium R8 cap
+                                     # (medium/coarse boundary reuses R3_SCALE_BREAKPOINT_HIGH)
+R8_ORIENTATION_ENTROPY_MAX = 2.5     # bits; above this, skip R8 (isotropic texture)
 
 # R3 scale-adaptive ceiling for small/medium pits (area < LARGE_PIT_AREA_UM2).
 # Large pits always use MAX_ASPECT_RATIO_LARGE_PIT = 12.0 regardless of scale.
 # For small pits at low magnification (high µm/px) scratch segments look like
 # short elongated blobs — tighten the ceiling to suppress them.
+R3_SCALE_BREAKPOINT_LOW    = 2.0    # µm/px; below this, use standard fine ceiling (8.0)
 R3_SCALE_BREAKPOINT_HIGH   = 4.0    # µm/px; above this, apply the coarse ceiling
-MAX_ASPECT_RATIO_COARSE    = 5.0    # R3 ceiling for scale > 4 µm/px, small pits
-                                    # (unchanged: 8.0 applies at ≤ 4 µm/px)
+MAX_ASPECT_RATIO_MEDIUM    = 6.5    # R3 ceiling for 2.0 ≤ scale < 4.0 µm/px, small pits
+                                    # Medium scale: scratch remnants more elongated than
+                                    # at fine scale; tighten from 8.0 without going to 5.0.
+MAX_ASPECT_RATIO_COARSE    = 5.0    # R3 ceiling for scale ≥ 4 µm/px, small pits
 
 # R7 scale-adaptive darkness threshold (surface pits only).
 # At low magnification real pits integrate more shadow → appear darker, so we
@@ -465,11 +500,13 @@ def _process_candidate(candidate, pit_type, scale_um_per_px,
     # appear as short elongated blobs indistinguishable from micro-pits at
     # the standard 8.0 ceiling.
     if area_um2 >= LARGE_PIT_AREA_UM2:
-        aspect_ceiling = MAX_ASPECT_RATIO_LARGE_PIT
-    elif scale_um_per_px > R3_SCALE_BREAKPOINT_HIGH:
-        aspect_ceiling = MAX_ASPECT_RATIO_COARSE
-    else:
-        aspect_ceiling = MAX_ASPECT_RATIO
+        aspect_ceiling = MAX_ASPECT_RATIO_LARGE_PIT        # 12.0 — coalesced damage
+    elif scale_um_per_px >= R3_SCALE_BREAKPOINT_HIGH:      # ≥ 4.0 µm/px
+        aspect_ceiling = MAX_ASPECT_RATIO_COARSE           # 5.0  — overview/coarse
+    elif scale_um_per_px >= R3_SCALE_BREAKPOINT_LOW:       # 2.0–4.0 µm/px
+        aspect_ceiling = MAX_ASPECT_RATIO_MEDIUM           # 6.5  — medium scale
+    else:                                                  # < 2.0 µm/px
+        aspect_ceiling = MAX_ASPECT_RATIO                  # 8.0  — fine scale
     if aspect_ratio > aspect_ceiling:
         rejection_reasons.append(
             f"R3:aspect {aspect_ratio:.2f} > max {aspect_ceiling}"
@@ -479,8 +516,12 @@ def _process_candidate(candidate, pit_type, scale_um_per_px,
     # are noise.  Applying R4 to edge pits would reject real large pits.
     # Large surface pits can be very irregular; a relaxed floor applies when
     # area ≥ LARGE_PIT_AREA_UM2 to avoid discarding genuine macro damage.
-    circ_floor = (MIN_CIRCULARITY_LARGE_PIT if area_um2 >= LARGE_PIT_AREA_UM2
-                  else MIN_CIRCULARITY)
+    if area_um2 >= LARGE_PIT_AREA_UM2:
+        circ_floor = MIN_CIRCULARITY_LARGE_PIT           # 0.04 — large pits can be irregular
+    elif scale_um_per_px < R4_SCALE_BREAKPOINT:          # < 1.5 µm/px (fine scale)
+        circ_floor = MIN_CIRCULARITY_FINE                # 0.12 — real pits are rounder here
+    else:
+        circ_floor = MIN_CIRCULARITY                     # 0.08 — standard
     if pit_type != "edge" and circularity < circ_floor:
         rejection_reasons.append(
             f"R4:circ {circularity:.4f} < min {circ_floor}"
@@ -511,15 +552,21 @@ def _process_candidate(candidate, pit_type, scale_um_per_px,
     # Three conditions must ALL hold:
     #   (a) major-axis within R8_ANGLE_TOLERANCE_DEG of dominant scratch direction
     #   (b) aspect_ratio > R8_MIN_ASPECT_RATIO  (elongated shape)
-    #   (c) area_um2 < R8_MAX_AREA_UM2          (large pits exempt)
+    #   (c) area_um2 < r8_area_cap              (large pits exempt; cap is scale-adaptive)
     # Skipped when dominant_orientation is None (isotropic texture, or no clear
     # scratch direction found for this image).
     # Reclassified pits (confirmed interior by spatial test) are also exempt.
+    if scale_um_per_px < R8_SCALE_BREAKPOINT:            # < 1.5 µm/px
+        r8_area_cap = R8_MAX_AREA_UM2_FINE
+    elif scale_um_per_px >= R3_SCALE_BREAKPOINT_HIGH:    # ≥ 4.0 µm/px
+        r8_area_cap = R8_MAX_AREA_UM2_COARSE
+    else:                                                # 1.5–4.0 µm/px
+        r8_area_cap = R8_MAX_AREA_UM2_MEDIUM
     if (pit_type == "surface"
             and not candidate.get("reclassified_from_edge")
             and dominant_orientation is not None
             and aspect_ratio > R8_MIN_ASPECT_RATIO
-            and area_um2 < R8_MAX_AREA_UM2):
+            and area_um2 < r8_area_cap):
         delta = abs(pit_angle_deg - dominant_orientation)
         delta = min(delta, 180.0 - delta)
         if delta <= R8_ANGLE_TOLERANCE_DEG:
@@ -698,8 +745,12 @@ def detect_pits(image_input, scale_um_per_px, specimen_mask, roi_dims,
     # Pixel floor: MIN_PIXEL_COUNT × scale² prevents single-pixel noise blobs
     # from surviving at low magnification (large scale_um_per_px) where the
     # coefficient floor alone collapses to near-zero µm².
-    pixel_floor_um2 = MIN_PIXEL_COUNT * (scale_um_per_px ** 2)
+    px_count = (MIN_PIXEL_COUNT_COARSE
+                if scale_um_per_px >= R5_COARSE_BREAKPOINT
+                else MIN_PIXEL_COUNT)
+    pixel_floor_um2 = px_count * (scale_um_per_px ** 2)
     effective_min_area_um2 = max(MIN_PIT_AREA_UM2,
+                                 R5_PHYSICAL_MIN_AREA_UM2,
                                  SCALE_AWARE_AREA_COEFF / scale_um_per_px,
                                  pixel_floor_um2)
 
@@ -790,12 +841,12 @@ def detect_pits(image_input, scale_um_per_px, specimen_mask, roi_dims,
     # the neighbour threshold — AND (b) its area falls in the bottom 25th
     # percentile among survivors.
     #
-    # Neighbour threshold derivation:
-    #   threshold_um = 200 * scale_um_per_px
-    #   threshold_px = threshold_um / scale_um_per_px  = 200 (always 200 px)
-    # The fixed pixel distance ensures consistent coverage at every mag level
-    # while expressing a physically larger µm radius on lower-mag images.
-    NEIGHBOR_THRESHOLD_PX_SQ = 200.0 ** 2
+    # Neighbour threshold: R6_ISOLATION_DISTANCE_UM (200 µm) converted to
+    # pixels at the current scale.  Using a physical distance ensures R6
+    # behaves consistently across magnifications.  A fixed pixel distance
+    # (previously 200 px) corresponded to 840 µm at 4.2 µm/px, effectively
+    # disabling R6 at coarse scale.
+    neighbor_threshold_px_sq = (R6_ISOLATION_DISTANCE_UM / scale_um_per_px) ** 2
 
     confirmed_pits = []
     rejected_r6    = []
@@ -813,7 +864,7 @@ def detect_pits(image_input, scale_um_per_px, specimen_mask, roi_dims,
                     continue
                 dx = cx - other["centroid_x_px"]
                 dy = cy - other["centroid_y_px"]
-                if dx * dx + dy * dy <= NEIGHBOR_THRESHOLD_PX_SQ:
+                if dx * dx + dy * dy <= neighbor_threshold_px_sq:
                     break
             else:
                 isolated_indices.add(idx)
