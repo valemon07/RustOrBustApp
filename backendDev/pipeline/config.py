@@ -39,6 +39,41 @@ MANUAL_SCALE_OVERRIDES: dict[str, float] = {
 }
 
 # ---------------------------------------------------------------------------
+# Stage 2 preprocessing
+# ---------------------------------------------------------------------------
+# CLAHE (Contrast Limited Adaptive Histogram Equalization) corrects non-uniform
+# illumination before Otsu thresholding.  Set to False to skip the step.
+USE_CLAHE: bool = True
+CLAHE_CLIP_LIMIT: float = 2.0          # at high-mag; scaled down at overview
+CLAHE_TILE_GRID_SIZE: tuple[int, int] = (8, 8)
+
+# Mask fill-ratio quality thresholds.
+# fill_ratio = hull_mask_pixels / bounding_box_pixels
+# Values outside [LOW, HIGH] receive a warning flag in the CSV.
+MASK_FILL_LOW_THRESHOLD: float  = 0.02   # nearly empty → segmentation likely failed
+MASK_FILL_HIGH_THRESHOLD: float = 0.85   # nearly full bbox → background may be included
+
+# ---------------------------------------------------------------------------
+# MASK_ROI_INCOMPLETE flag thresholds (Stage 2)
+# ---------------------------------------------------------------------------
+# Check 1 — saturation bleed: fraction of hull pixels with HSV-V > this value
+ROI_SAT_V_THRESHOLD: int   = 240
+ROI_SAT_MAX_FRACTION: float = 0.60   # >60% overexposed pixels → flag
+
+# Check 2 — spatial uniformity: 3×3 grid fill ratio thresholds
+ROI_GRID_HIGH_FILL: float = 0.70   # cell is "full"
+ROI_GRID_LOW_FILL:  float = 0.25   # adjacent cell is "empty" → concentration detected
+
+# Check 3 (removed) — boundary_clipping was retired: specimens legitimately
+# extend beyond the microscope field of view in any direction.
+
+# Check 4 — narrow ROI: minimum fraction of full image dimension
+ROI_MIN_DIM_FRACTION: float = 0.25
+
+# Check 5 — low fill ratio that also raises MASK_ROI_INCOMPLETE
+ROI_INCOMPLETE_LOW_FILL: float = 0.04
+
+# ---------------------------------------------------------------------------
 # Excluded specimens
 # ---------------------------------------------------------------------------
 # Specimen IDs whose images should be skipped entirely by the standard

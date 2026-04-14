@@ -81,3 +81,51 @@ Columns: filename, sample_id, scale_um_per_px, pit_count,
     Overview images: ~4.20 µm/px, 1000 µm scale bar
     High-mag images: ~1.05 µm/px, 150 µm scale bar
   Both are handled correctly by scale-aware thresholds.
+## Known Pipeline Challenges (updated 2026-04-09)
+
+### Challenge 1: Large edge-originating pits misclassified as edge features
+**Status:** Open — fix in progress  
+**Affected images:** CR3-7_c-side_BF007 and similar severe-class images with 
+finger-like or coalescing pits that begin at the sample edge  
+**Symptom:** Stage 2 mask correctly segments these pits; Stage 3 classifies them 
+as `edge-macro` and rejects them, yielding anomalously low macro pit counts  
+**Root cause (hypothesized):** Edge-zone classification uses a binary touch test — 
+any candidate that intersects the edge buffer is labeled edge-macro regardless of 
+how much of its area is in the interior  
+**Proposed fix:** Replace binary touch test with an area-overlap fraction check; 
+pits with <60% of area in the edge zone should be reclassified as surface-macro. 
+For pits ≥ 2000 µm², also apply a centroid-location test as a secondary criterion.  
+**Risk:** Could increase false positives if large background regions near the edge 
+pass the overlap check — validate on full test suite after change.
+
+### Challenge 2: Scale-dependent pixel-floor noise (resolved — df57a9a)
+Single-pixel noise at low magnification was admitted by the old area floor. 
+Fixed in R5 with `effective_min = max(10, 84/scale, 15·scale²)`.
+
+### Challenge 3: Large irregular pits rejected by circularity/aspect rules (resolved — df57a9a)
+Crevice and coalescing pits with area ≥ 2000 µm² were being discarded by R3/R4. 
+Fixed by relaxing aspect ceiling to 12.0 and circularity floor to 0.04 for that 
+size class.
+
+### Challenge 4: Surface scratches passing darkness threshold (resolved — df57a9a)
+Scratches in the 0.70–0.91 brightness range were passing R7. Fixed by tightening 
+threshold from 0.92 → 0.85 (confirmed pits max at 0.69).
+
+### Challenge 5: Scale-dependent false positives from surface scratches (open)
+**Status:** Open — fix in progress  
+**Affected images:** High-scale images (≥4 µm/px), e.g. CR3-8_c8-side_pit005 
+(scale=5.96, macro=191 — grossly overcounted)  
+**Symptom:** Machining grain lines and surface scratches are segmented into 
+short elongated blobs at low magnification and confirmed as macro pits. Rules 
+R3/R5/R7 pass them individually because each fragment looks borderline-acceptable.  
+**Root cause:** R3, R7 have no scale dependence. At 6 µm/px a 2×20 pixel scratch 
+fragment covers ~1400 µm² with aspect ~3–4 — passing all current rules.  
+**Proposed fix:** 
+  - R8 (new): reject candidates whose major axis aligns within 20° of dominant 
+    surface texture orientation AND aspect > 3 AND area < 5000 µm²
+  - R3 scale-adaptive ceiling: 12→8→5 at scale <2 / 2–4 / >4 µm/px
+  - R7 scale-adaptive darkness: 0.85→0.78 interpolated between 2–4 µm/px  
+**Risk:** R8 dominant-orientation detection may be unreliable on isotropic 
+surfaces — add entropy fallback to skip R8 if texture has no clear direction.  
+**Validation targets:** CR3-8 macro count should drop substantially; 
+moderate-class images (clean surface, ~1 µm/px) should be unaffected.

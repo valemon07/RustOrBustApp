@@ -14,6 +14,7 @@ Debug images are saved only for flagged images to keep runtime manageable.
 
 import csv
 import glob
+import json as _json
 import math
 import os
 import re
@@ -29,6 +30,12 @@ from pipeline.stage2_roi           import extract_roi
 from pipeline.stage3_pit_detection import detect_pits
 from pipeline.stage4_density       import calculate_density
 from pipeline.config               import MANUAL_SCALE_OVERRIDES, NO_SCALE_BAR_IMAGES, EXCLUDED_SPECIMENS
+
+def _flags_to_json(flags):
+    if not flags:
+        return "[]"
+    return _json.dumps([f.to_dict() for f in flags], separators=(",", ":"))
+
 
 ROOT        = os.path.join(os.path.dirname(__file__), "..")
 RAW_DIR     = os.path.join(ROOT, "data", "raw")
@@ -132,6 +139,10 @@ def _run_pipeline(image_path):
         "rejected_R5":          0,
         "rejected_R6":          0,
         "rejected_R7":          0,
+        "mask_fill_ratio":      None,
+        "mask_warning":         None,
+        "roi_incomplete":       False,
+        "roi_flags":            [],
         "no_scale_bar":         False,
         "excluded":             False,
         "error":                None,
@@ -160,8 +171,12 @@ def _run_pipeline(image_path):
 
         # Stage 2
         specimen_mask, _, roi_dims, _ = extract_roi(image_path, scale_um_per_px)
-        result["roi_width_um"]  = roi_dims["width_um"]
-        result["roi_height_um"] = roi_dims["height_um"]
+        result["roi_width_um"]    = roi_dims["width_um"]
+        result["roi_height_um"]   = roi_dims["height_um"]
+        result["mask_fill_ratio"] = roi_dims["mask_fill_ratio"]
+        result["mask_warning"]    = roi_dims["mask_warning"]
+        result["roi_incomplete"]  = roi_dims["roi_incomplete"]
+        result["roi_flags"]       = roi_dims["pipeline_flags"]
 
         # Stage 3
         confirmed_pits, rejected_candidates, _ = detect_pits(
@@ -338,6 +353,8 @@ def main():
         "filename", "specimen_id", "label",
         "scale_um_per_px", "scale_bar_um",
         "roi_width_um", "roi_height_um",
+        "mask_fill_ratio", "mask_warning",
+        "roi_incomplete", "roi_flags",
         "macro_pit_count", "macro_density_per_cm",
         "full_pit_count", "full_density_per_cm",
         "pit_count", "pit_density_per_cm2",
@@ -359,6 +376,10 @@ def main():
                 "scale_bar_um":         row["scale_bar_um"]    or "",
                 "roi_width_um":         row["roi_width_um"]    or "",
                 "roi_height_um":        row["roi_height_um"]   or "",
+                "mask_fill_ratio":      row["mask_fill_ratio"] if row["mask_fill_ratio"] is not None else "",
+                "mask_warning":         row["mask_warning"]    or "",
+                "roi_incomplete":       "True" if row["roi_incomplete"] else "False",
+                "roi_flags":            _flags_to_json(row["roi_flags"]),
                 "macro_pit_count":      row["macro_pit_count"],
                 "macro_density_per_cm": row["macro_density_per_cm"],
                 "full_pit_count":       row["full_pit_count"],
@@ -381,7 +402,7 @@ def main():
             })
     print(f"\nCSV written: {CSV_OUT}")
 
-    # --- Validate new depth/density columns for successful images ----------
+    # --- Validate depth/density columns for successful images --------------
     REQUIRED_COLS = ["pit_count", "pit_density_per_cm2",
                      "avg_pit_depth_um", "max_pit_depth_um", "pit_depths_um"]
     validation_errors = []
@@ -402,6 +423,45 @@ def main():
         print(f"  Validation OK — {REQUIRED_COLS} present and non-null "
               f"for all {len([r for r in rows if not r.get('excluded') and not r.get('no_scale_bar') and not r['error'] and r['pit_count'] > 0])} "
               f"images with pits.")
+
+    # --- Validate mask quality columns for all processed images ------------
+    MASK_COLS = ["mask_fill_ratio", "mask_warning"]
+    mask_errors = []
+    mask_warnings_seen = []
+    processed = [r for r in rows
+                 if not r.get("excluded") and not r.get("no_scale_bar") and not r["error"]]
+    for row in processed:
+        for col in MASK_COLS:
+            if row.get(col) is None and col == "mask_fill_ratio":
+                mask_errors.append(f"  {row['filename']}: {col} is null")
+        if row.get("mask_warning"):
+            mask_warnings_seen.append(
+                f"  {row['filename']}: mask_warning={row['mask_warning']}  "
+                f"fill_ratio={row['mask_fill_ratio']}"
+            )
+    if mask_errors:
+        print("\n  VALIDATION FAILURES (mask quality columns):")
+        for msg in mask_errors:
+            print(msg)
+    else:
+        print(f"  Validation OK — mask_fill_ratio and mask_warning present "
+              f"for all {len(processed)} processed images.")
+    if mask_warnings_seen:
+        print(f"  Mask quality warnings ({len(mask_warnings_seen)} images):")
+        for msg in mask_warnings_seen:
+            print(msg)
+
+    # --- Validate roi_incomplete column and report flagged images ----------
+    incomplete_rows = [r for r in processed if r.get("roi_incomplete")]
+    pct_flagged = len(incomplete_rows) / len(processed) * 100 if processed else 0.0
+    print(f"\n  ROI_INCOMPLETE flags: {len(incomplete_rows)} / {len(processed)} "
+          f"processed images ({pct_flagged:.1f}%)")
+    if pct_flagged > 20.0:
+        print("  *** WARNING: >20% of images flagged — thresholds may be too aggressive.")
+    for row in incomplete_rows:
+        flags = row.get("roi_flags", [])
+        detail = flags[0].detail if flags else "(no detail)"
+        print(f"    {row['filename']}: {detail}")
 
     # --- Print results table -----------------------------------------------
     print()

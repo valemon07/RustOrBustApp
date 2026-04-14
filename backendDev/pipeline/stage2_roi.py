@@ -35,6 +35,18 @@ debug_vis     : ndarray BGR     colour-coded diagnostic image
 import cv2
 import numpy as np
 
+from pipeline.config import (
+    USE_CLAHE, CLAHE_CLIP_LIMIT, CLAHE_TILE_GRID_SIZE,
+    MASK_FILL_LOW_THRESHOLD, MASK_FILL_HIGH_THRESHOLD,
+    ROI_SAT_V_THRESHOLD, ROI_SAT_MAX_FRACTION,
+    ROI_GRID_HIGH_FILL, ROI_GRID_LOW_FILL,
+    ROI_MIN_DIM_FRACTION,
+    ROI_INCOMPLETE_LOW_FILL,
+)
+from pipeline.pipeline_flags import (
+    PipelineFlag, MASK_ROI_INCOMPLETE, SEVERITY_ERROR,
+)
+
 
 # ---------------------------------------------------------------------------
 # Tuneable constants
@@ -195,6 +207,115 @@ def _classify_dark_regions(hull_mask, otsu_mask):
 
 
 # ---------------------------------------------------------------------------
+# ROI completeness checks
+# ---------------------------------------------------------------------------
+
+def _check_roi_completeness(
+    image,
+    hull_mask,
+    x_min, x_max, y_min, y_max,
+    img_h, img_w,
+    mask_fill_ratio,
+):
+    """
+    Run all five MASK_ROI_INCOMPLETE checks.  Returns a list of
+    PipelineFlag objects — empty list means the ROI looks complete.
+
+    The check is CONSERVATIVE: any single failing check raises the flag.
+    """
+    triggered_details = []
+
+    hull_crop = hull_mask[y_min : y_max + 1, x_min : x_max + 1]
+    hull_pixel_count = int(np.count_nonzero(hull_crop))
+
+    # --- Check 1: Saturation bleed ----------------------------------------
+    # Count hull pixels that are near-white (high V AND low S).
+    # High V alone catches polished metal (gold/yellow = high V, high S).
+    # Requiring S < 60 restricts the flag to true camera overexposure (white).
+    roi_bgr = image[y_min : y_max + 1, x_min : x_max + 1]
+    hsv     = cv2.cvtColor(roi_bgr, cv2.COLOR_BGR2HSV)
+    v_ch    = hsv[:, :, 2]
+    s_ch    = hsv[:, :, 1]
+    overexposed = int(np.sum((v_ch > ROI_SAT_V_THRESHOLD) & (s_ch < 60) & (hull_crop > 0)))
+    sat_fraction = overexposed / hull_pixel_count if hull_pixel_count > 0 else 0.0
+    if sat_fraction > ROI_SAT_MAX_FRACTION:
+        triggered_details.append(
+            f"saturation_bleed: {sat_fraction * 100:.1f}% of ROI pixels "
+            f"near-white (HSV-V > {ROI_SAT_V_THRESHOLD}, S < 60)"
+        )
+
+    # --- Check 2: Spatial uniformity (3×3 grid) ---------------------------
+    # If any cell has fill_ratio > ROI_GRID_HIGH_FILL and a 4-connected
+    # neighbour has fill_ratio < ROI_GRID_LOW_FILL, the mask is unevenly
+    # concentrated, suggesting only part of the specimen was captured.
+    bbox_h = y_max - y_min + 1
+    bbox_w = x_max - x_min + 1
+    grid_fills = np.zeros((3, 3), dtype=float)
+    for row in range(3):
+        r0 = int(row       * bbox_h / 3)
+        r1 = int((row + 1) * bbox_h / 3) if row < 2 else bbox_h
+        for col in range(3):
+            c0   = int(col       * bbox_w / 3)
+            c1   = int((col + 1) * bbox_w / 3) if col < 2 else bbox_w
+            cell = hull_crop[r0:r1, c0:c1]
+            cell_area = cell.size
+            grid_fills[row, col] = (
+                int(np.count_nonzero(cell)) / cell_area if cell_area > 0 else 0.0
+            )
+
+    flagged_pairs = []
+    for row in range(3):
+        for col in range(3):
+            if grid_fills[row, col] > ROI_GRID_HIGH_FILL:
+                for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                    nr, nc = row + dr, col + dc
+                    if 0 <= nr < 3 and 0 <= nc < 3:
+                        if grid_fills[nr, nc] < ROI_GRID_LOW_FILL:
+                            flagged_pairs.append((row, col, nr, nc))
+                            break
+    if flagged_pairs:
+        pair_desc = "; ".join(
+            f"cell({r},{c})={grid_fills[r, c]:.2f} adj cell({nr},{nc})={grid_fills[nr, nc]:.2f}"
+            for r, c, nr, nc in flagged_pairs[:3]
+        )
+        triggered_details.append(f"spatial_uniformity: {pair_desc}")
+
+    # --- Check 4: Narrow ROI relative to image ----------------------------
+    narrow_dims = []
+    min_w = ROI_MIN_DIM_FRACTION * img_w
+    min_h = ROI_MIN_DIM_FRACTION * img_h
+    if (x_max - x_min + 1) < min_w:
+        narrow_dims.append(
+            f"width={x_max - x_min + 1}px < {ROI_MIN_DIM_FRACTION * 100:.0f}% "
+            f"of image width ({int(min_w)}px)"
+        )
+    if (y_max - y_min + 1) < min_h:
+        narrow_dims.append(
+            f"height={y_max - y_min + 1}px < {ROI_MIN_DIM_FRACTION * 100:.0f}% "
+            f"of image height ({int(min_h)}px)"
+        )
+    if narrow_dims:
+        triggered_details.append(f"narrow_roi: {'; '.join(narrow_dims)}")
+
+    # --- Check 5: Overall fill ratio below ROI_INCOMPLETE_LOW_FILL --------
+    if mask_fill_ratio < ROI_INCOMPLETE_LOW_FILL:
+        triggered_details.append(
+            f"low_fill_ratio: {mask_fill_ratio:.4f} < {ROI_INCOMPLETE_LOW_FILL}"
+        )
+
+    if not triggered_details:
+        return []
+
+    return [
+        PipelineFlag(
+            name=MASK_ROI_INCOMPLETE,
+            severity=SEVERITY_ERROR,
+            detail="; ".join(triggered_details),
+        )
+    ]
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -233,6 +354,19 @@ def extract_roi(image_input, scale_um_per_px=1.0):
     img_h, img_w = image.shape[:2]
 
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+    # --- 0. Optional CLAHE pass to correct non-uniform illumination ---------
+    # At overview scale (≥3 µm/px) reduce clip limit proportionally to avoid
+    # amplifying grain texture into false pit candidates.
+    if USE_CLAHE:
+        clip = CLAHE_CLIP_LIMIT
+        if scale_um_per_px >= 3.0:
+            clip = max(1.0, CLAHE_CLIP_LIMIT * (3.0 / scale_um_per_px))
+        clahe = cv2.createCLAHE(
+            clipLimit=clip,
+            tileGridSize=CLAHE_TILE_GRID_SIZE,
+        )
+        gray = clahe.apply(gray)
 
     # --- 1. Gaussian blur + Otsu threshold ----------------------------------
     blurred = cv2.GaussianBlur(
@@ -288,13 +422,38 @@ def extract_roi(image_input, scale_um_per_px=1.0):
     width_px  = x_max - x_min + 1
     height_px = y_max - y_min + 1
 
+    # --- 6b. Mask fill ratio and quality warning ----------------------------
+    mask_pixel_count = int(np.count_nonzero(hull_mask))
+    roi_area_pixels  = width_px * height_px
+    mask_fill_ratio  = mask_pixel_count / roi_area_pixels if roi_area_pixels > 0 else 0.0
+
+    if mask_fill_ratio < MASK_FILL_LOW_THRESHOLD:
+        mask_warning = "low_coverage"
+    elif mask_fill_ratio > MASK_FILL_HIGH_THRESHOLD:
+        mask_warning = "high_coverage"
+    else:
+        mask_warning = None
+
+    # --- 6c. ROI completeness checks ----------------------------------------
+    pipeline_flags = _check_roi_completeness(
+        image, hull_mask,
+        x_min, x_max, y_min, y_max,
+        img_h, img_w,
+        mask_fill_ratio,
+    )
+    roi_incomplete = any(f.name == MASK_ROI_INCOMPLETE for f in pipeline_flags)
+
     roi_dims = {
-        "width_px":    width_px,
-        "height_px":   height_px,
-        "width_um":    round(width_px  * scale_um_per_px, 2),
-        "height_um":   round(height_px * scale_um_per_px, 2),
-        "edge_pits":   edge_pits,
-        "surface_pits": surface_pits,
+        "width_px":        width_px,
+        "height_px":       height_px,
+        "width_um":        round(width_px  * scale_um_per_px, 2),
+        "height_um":       round(height_px * scale_um_per_px, 2),
+        "edge_pits":       edge_pits,
+        "surface_pits":    surface_pits,
+        "mask_fill_ratio": round(mask_fill_ratio, 4),
+        "mask_warning":    mask_warning,
+        "pipeline_flags":  pipeline_flags,
+        "roi_incomplete":  roi_incomplete,
     }
 
     # Bounding-box crop with non-hull pixels blacked out.
