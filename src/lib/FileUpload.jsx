@@ -53,6 +53,11 @@ export default function FileUpload({ className, isDragging = false }) {
               formData.append("image", file, file.name);
             }
           }
+
+          // TODO: validate with backend
+          if(options.settings) {
+            formData.append("settings", JSON.stringify(options.settings))
+          }
   
           const res = await fetch(endpoint, {
             method: "POST",
@@ -93,7 +98,6 @@ export default function FileUpload({ className, isDragging = false }) {
     );
   
     await Promise.all(workers);
-  
   
     // combine CSV texts, attempt to keep only first header
     const nonEmpty = results.filter(Boolean);
