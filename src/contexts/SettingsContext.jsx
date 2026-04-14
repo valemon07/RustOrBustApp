@@ -14,17 +14,49 @@ export const SettingsContext = createContext();
 export function SettingsProvider({ children }) {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [useDefaults, setUseDefaults] = useState(true);
+  const [usingDefaultPerSetting, setUsingDefaultPerSetting] = useState({
+    largePixelAreaThreshold: true,
+    scaleBreakpointHigh: true,
+    edgeReclassificationThreshold: true,
+    surfacePitDarknessThreshold: true,
+  });
 
   const updateSetting = (key, value) => {
+    const parsedValue = typeof value === 'string' ? parseFloat(value) || 0 : value;
     setSettings(prev => ({
       ...prev,
-      [key]: typeof value === 'string' ? parseFloat(value) || 0 : value
+      [key]: parsedValue
+    }));
+    
+    // Auto-toggle: if value matches default, mark as using default; otherwise mark as custom
+    const isDefault = parsedValue === DEFAULT_SETTINGS[key];
+    setUsingDefaultPerSetting(prev => ({
+      ...prev,
+      [key]: isDefault
+    }));
+  };
+
+  const toggleSettingDefault = (key) => {
+    // Clicking the default button always restores to default
+    setSettings(prev => ({
+      ...prev,
+      [key]: DEFAULT_SETTINGS[key]
+    }));
+    setUsingDefaultPerSetting(prev => ({
+      ...prev,
+      [key]: true
     }));
   };
 
   const resetToDefaults = () => {
     setSettings(DEFAULT_SETTINGS);
     setUseDefaults(true);
+    setUsingDefaultPerSetting({
+      largePixelAreaThreshold: true,
+      scaleBreakpointHigh: true,
+      edgeReclassificationThreshold: true,
+      surfacePitDarknessThreshold: true,
+    });
   };
 
   const exportSettings = () => {
@@ -38,7 +70,10 @@ export function SettingsProvider({ children }) {
       resetToDefaults,
       exportSettings,
       useDefaults,
-      setUseDefaults
+      setUseDefaults,
+      usingDefaultPerSetting,
+      toggleSettingDefault,
+      DEFAULT_SETTINGS
     }}>
       {children}
     </SettingsContext.Provider>

@@ -119,14 +119,30 @@
   font-weight: 500;
   transition: all 200ms var(--picker-ease);
   width: fit-content;
-  max-width: 920px;
-  align-self: center;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .settings-icon {
   width: 20px;
   height: 20px;
   flex-shrink: 0;
+}
+
+:root[data-theme="dark"] .settings-icon,
+:root.theme-dark .settings-icon,
+body[data-theme="dark"] .settings-icon,
+body.theme-dark .settings-icon {
+  filter: invert(1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="auto"] .settings-icon,
+  :root.theme-auto .settings-icon,
+  body[data-theme="auto"] .settings-icon,
+  body.theme-auto .settings-icon {
+    filter: invert(1);
+  }
 }
 
 .settings-button-label {
