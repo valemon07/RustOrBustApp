@@ -3,7 +3,14 @@ import { SettingsContext } from '../contexts/SettingsContext';
 import './SettingsPanel.css';
 
 export default function SettingsPanel({ onClose }) {
-  const { settings, updateSetting, resetToDefaults, useDefaults, setUseDefaults } = useContext(SettingsContext);
+  const { 
+    settings, 
+    updateSetting, 
+    resetToDefaults, 
+    usingDefaultPerSetting, 
+    toggleSettingDefault,
+    DEFAULT_SETTINGS 
+  } = useContext(SettingsContext);
 
   const settingsMetadata = [
     { key: 'largePixelAreaThreshold', label: 'Large Pit Area (µm²)', step: 100, min: 0 },
@@ -22,9 +29,11 @@ export default function SettingsPanel({ onClose }) {
             title="Back to upload"
             aria-label="Back to upload"
           >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M19 12H5M12 19l-7-7 7-7"></path>
-            </svg>
+            <img
+              src="src/assets/arrow-left-solid-full.svg"
+              alt="Back Icon"
+              className="back-icon"
+            />
             Back
           </button>
         )}
@@ -32,43 +41,47 @@ export default function SettingsPanel({ onClose }) {
       </div>
 
       <div className="settings-content">
-        <div className="settings-toggle">
-          <label>
-            <input
-              type="checkbox"
-              checked={useDefaults}
-              onChange={(e) => setUseDefaults(e.target.checked)}
-            />
-            Use Backend Defaults
-          </label>
-        </div>
-
-        {!useDefaults && (
-          <div className="settings-grid">
-            {settingsMetadata.map(({ key, label, step, min }) => (
-              <div key={key} className="setting-field">
-                <label htmlFor={key}>{label}</label>
+        <div className="settings-list">
+          {settingsMetadata.map(({ key, label, step, min }) => (
+            <div key={key} className="setting-item">
+              <div className="setting-item-left">
+                <div className="setting-item-info">
+                  <label htmlFor={key}>{label}</label>
+                  <span className="setting-default-hint">
+                    Default: {DEFAULT_SETTINGS[key]}
+                  </span>
+                </div>
+              </div>
+              <div className="setting-item-right">
                 <input
                   id={key}
                   type="number"
                   value={settings[key]}
                   onChange={(e) => updateSetting(key, e.target.value)}
+                  placeholder={`${DEFAULT_SETTINGS[key]}`}
                   step={step}
                   min={min}
+                  aria-describedby={`${key}-default`}
                 />
+                <button
+                  className={`use-default-button ${usingDefaultPerSetting[key] ? 'active' : ''}`}
+                  onClick={() => toggleSettingDefault(key)}
+                  title={usingDefaultPerSetting[key] ? 'Using default value' : 'Restore default'}
+                  aria-label={`Toggle default for ${label}`}
+                >
+                  Default
+                </button>
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          ))}
+        </div>
       </div>
 
-      {!useDefaults && (
-        <div className="settings-actions">
-          <button className="settings-reset" onClick={resetToDefaults}>
-            Reset to Defaults
-          </button>
-        </div>
-      )}
+      <div className="settings-actions">
+        <button className="settings-reset" onClick={resetToDefaults}>
+          Reset All to Defaults
+        </button>
+      </div>
     </div>
   );
 }

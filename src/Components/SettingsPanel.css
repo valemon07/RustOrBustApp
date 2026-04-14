@@ -32,28 +32,35 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   padding: 8px 12px;
-  background: transparent;
+  background: var(--picker-surface);
   border: 1px solid var(--picker-border);
   border-radius: 6px;
   color: var(--picker-text);
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 500;
   transition: all 200ms var(--picker-ease);
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .settings-back-button:hover {
   background: var(--picker-primary);
   color: white;
   border-color: var(--picker-primary);
+  transform: translateY(-1px);
 }
 
-.settings-back-button svg {
-  width: 18px;
-  height: 18px;
+.settings-back-button:active {
+  transform: translateY(0);
+}
+
+.back-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
 }
 
 .settings-panel h2 {
@@ -69,28 +76,104 @@
   overflow-y: auto;
 }
 
-.settings-toggle {
+.settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   margin-bottom: 24px;
-  padding: 16px;
-  background: var(--picker-bg-soft);
-  border-radius: 8px;
-  border: 1px solid var(--picker-border);
 }
 
-.settings-toggle label {
+.setting-item {
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+  background: var(--picker-surface);
+  border: 1px solid var(--picker-border);
+  border-radius: 8px;
+  transition: all 150ms var(--picker-ease);
+}
+
+.setting-item:hover {
+  border-color: var(--picker-primary);
+  box-shadow: 0 2px 4px var(--picker-focus);
+}
+
+.setting-item-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.setting-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.setting-item-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.setting-item-left label {
+  font-size: 0.95rem;
   font-weight: 500;
-  cursor: pointer;
   color: var(--picker-text);
 }
 
-.settings-toggle input[type="checkbox"] {
+.setting-default-hint {
+  font-size: 0.8rem;
+  color: var(--picker-muted);
+}
+
+.setting-item-right input[type="number"] {
+  width: 120px;
+  padding: 8px 10px;
+  border: 1px solid var(--picker-border);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  background: var(--picker-bg-soft);
+  color: var(--picker-text);
+  transition: all 150ms var(--picker-ease);
+}
+
+.setting-item-right input[type="number"]:focus {
+  outline: none;
+  border-color: var(--picker-primary);
+  background: var(--picker-surface);
+  box-shadow: 0 0 0 2px var(--picker-focus);
+}
+
+.use-default-button {
+  padding: 8px 12px;
+  background: var(--picker-bg-soft);
+  border: 1px solid var(--picker-border);
+  border-radius: 6px;
+  color: var(--picker-text);
+  font-size: 0.85rem;
+  font-weight: 500;
   cursor: pointer;
-  width: 18px;
-  height: 18px;
-  accent-color: var(--picker-primary);
+  transition: all 150ms var(--picker-ease);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.use-default-button:hover {
+  background: var(--picker-primary);
+  border-color: var(--picker-primary);
+  color: white;
+}
+
+.use-default-button.active {
+  background: var(--picker-primary);
+  border-color: var(--picker-primary);
+  color: white;
 }
 
 .settings-grid {
@@ -107,7 +190,14 @@
 .setting-field {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
+}
+
+.setting-field-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .setting-field label {
@@ -116,7 +206,26 @@
   color: var(--picker-text);
 }
 
-.setting-field input[type="number"] {
+.use-default-toggle {
+  padding: 4px 8px;
+  background: transparent;
+  border: 1px solid var(--picker-primary);
+  border-radius: 4px;
+  color: var(--picker-primary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 150ms var(--picker-ease);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.use-default-toggle:hover {
+  background: var(--picker-primary);
+  color: white;
+}
+
+.setting-grid input[type="number"] {
   padding: 10px 12px;
   border: 1px solid var(--picker-border);
   border-radius: 6px;
@@ -126,7 +235,7 @@
   transition: border-color 200ms var(--picker-ease);
 }
 
-.setting-field input[type="number"]:focus {
+.setting-grid input[type="number"]:focus {
   outline: none;
   border-color: var(--picker-primary);
   box-shadow: 0 0 0 2px var(--picker-focus);
