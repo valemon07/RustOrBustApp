@@ -172,6 +172,10 @@ def _run_one(image_path):
         "rejected_R5":         0,
         "rejected_R6":         0,
         "rejected_R7":         0,
+        "mask_fill_ratio":     None,
+        "mask_warning":        None,
+        "roi_incomplete":      False,
+        "roi_flags":           [],
         "excluded":            False,
         "no_scale_bar":        False,
         "error":               None,
@@ -201,9 +205,13 @@ def _run_one(image_path):
         base["scale_bar_um"]    = um_value
 
         specimen_mask, _, roi_dims, stage2_vis = extract_roi(image_path, scale)
-        base["roi_width_um"]  = roi_dims["width_um"]
-        base["roi_height_um"] = roi_dims["height_um"]
-        base["_stage2_vis"]   = stage2_vis
+        base["roi_width_um"]    = roi_dims["width_um"]
+        base["roi_height_um"]   = roi_dims["height_um"]
+        base["mask_fill_ratio"] = roi_dims["mask_fill_ratio"]
+        base["mask_warning"]    = roi_dims["mask_warning"]
+        base["roi_incomplete"]  = roi_dims["roi_incomplete"]
+        base["roi_flags"]       = roi_dims["pipeline_flags"]
+        base["_stage2_vis"]     = stage2_vis
 
         confirmed, rejected, stage3_vis = detect_pits(
             image_path, scale, specimen_mask, roi_dims
@@ -486,10 +494,22 @@ primary scratch discriminator.
 # CSV writer
 # ---------------------------------------------------------------------------
 
+import json as _json
+
+
+def _flags_to_json(flags):
+    """Serialize a list of PipelineFlag objects to a compact JSON string."""
+    if not flags:
+        return "[]"
+    return _json.dumps([f.to_dict() for f in flags], separators=(",", ":"))
+
+
 CSV_FIELDS = [
     "filename", "specimen_id", "label",
     "scale_um_per_px", "scale_bar_um",
     "roi_width_um", "roi_height_um",
+    "mask_fill_ratio", "mask_warning",
+    "roi_incomplete", "roi_flags",
     "macro_pit_count", "macro_density_per_cm",
     "full_pit_count", "full_density_per_cm",
     "pit_count", "pit_density_per_cm2",
@@ -515,6 +535,10 @@ def _write_csv(out_dir, rows):
                 "scale_bar_um":         row["scale_bar_um"]    or "",
                 "roi_width_um":         row["roi_width_um"]    or "",
                 "roi_height_um":        row["roi_height_um"]   or "",
+                "mask_fill_ratio":      row["mask_fill_ratio"] if row["mask_fill_ratio"] is not None else "",
+                "mask_warning":         row["mask_warning"]    or "",
+                "roi_incomplete":       "True" if row["roi_incomplete"] else "False",
+                "roi_flags":            _flags_to_json(row["roi_flags"]),
                 "macro_pit_count":      row["macro_pit_count"],
                 "macro_density_per_cm": row["macro_density_per_cm"],
                 "full_pit_count":       row["full_pit_count"],
