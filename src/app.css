@@ -20,6 +20,12 @@
     pointer-events: none;
 }
 
+.main-stage.settings-mode {
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+}
+
 .main-stage {
     position: relative;
     z-index: 1;
@@ -27,6 +33,12 @@
     display: grid;
     gap: 12px;
     justify-items: center;
+}
+
+.main-stage.settings-mode {
+    width: min(1200px, 100%);
+    height: 100%;
+    gap: 0;
 }
 
 .hero-copy {

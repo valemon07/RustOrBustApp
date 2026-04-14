@@ -1,8 +1,11 @@
 import * as React from "react";
 import "./CenterPanel.css";
 import FileUpload from "../lib/FileUpload";
+import { useContext } from "react";
+import { SettingsContext } from "../contexts/SettingsContext";
+import SettingsPanel from "./SettingsPanel";
 
-export default function CenterPanel() {
+export default function CenterPanel({ showSettings, setShowSettings }) {
   const containerRef = React.useRef(null);
   const dragCounterRef = React.useRef(0);
   const [isDragging, setDragging] = React.useState(false);
@@ -47,29 +50,49 @@ export default function CenterPanel() {
     // Let FileUpload handle dropped files, or forward them here if needed.
   };
 
+  const { exportSettings } = useContext(SettingsContext);
+
   return (
     <div className="center-panel-wrapper">
-      <div
-        ref={containerRef}
-        className={`outer-panel ${isDragging ? "dragging" : ""}`}
-        role="button"
-        tabIndex={0}
-        aria-label={isDragging ? "File upload area — drag files here" : "File upload area — click or drop files here"}
-        onClick={openFileInput}
-        onKeyDown={onKeyDown}
-        onDragEnter={handleDragEnter}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-      >
-        <div className="panel-header">
-          <div className="panel-title">{isDragging ? "Drag here." : "Upload Files"}</div>
+      {showSettings ? (
+        <SettingsPanel onClose={() => setShowSettings(false)} />
+      ) : (
+        <div className="upload-view-wrapper">
+          <div
+            ref={containerRef}
+            className={`outer-panel ${isDragging ? "dragging" : ""}`}
+            role="button"
+            tabIndex={0}
+            aria-label={isDragging ? "File upload area — drag files here" : "File upload area — click or drop files here"}
+            onClick={openFileInput}
+            onKeyDown={onKeyDown}
+            onDragEnter={handleDragEnter}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            <div className="panel-header">
+              <div className="panel-title">{isDragging ? "Drag here." : "Upload Files"}</div>
+            </div>
+
+            <FileUpload className="inner-panel" isDragging={isDragging} />
+          </div>
+
+          <button
+            className="settings-icon-button"
+            onClick={() => setShowSettings(true)}
+            title="Pipeline settings"
+            aria-label="Open pipeline settings"
+          >
+            <img
+              src="src/assets/gear-solid-full.svg"
+              alt="Settings Icon"
+              className="settings-icon"
+            />
+            <span className="settings-button-label">Pipeline Settings</span>
+          </button>
         </div>
-
-        <FileUpload className="inner-panel" isDragging={isDragging} />
-
-        {/* <div className="panel-hint">Click to select files or drag & drop them here</div>*/}
-      </div>
+      )}
     </div>
   );
 }

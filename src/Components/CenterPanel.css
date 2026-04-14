@@ -2,6 +2,9 @@
   position: relative;
   padding: 18px;
   width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .outer-panel {
@@ -98,6 +101,47 @@
 
 .outer-panel.dragging .upload-icon {
   background: var(--picker-primary);
+}
+
+.settings-icon-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 20px;
+  padding: 12px 24px;
+  background: var(--picker-surface);
+  border: 1px solid var(--picker-border);
+  border-radius: 8px;
+  color: var(--picker-text);
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: all 200ms var(--picker-ease);
+  width: fit-content;
+  max-width: 920px;
+  align-self: center;
+}
+
+.settings-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.settings-button-label {
+  display: inline;
+}
+
+.settings-icon-button:hover {
+  background: var(--picker-primary);
+  color: white;
+  border-color: var(--picker-primary);
+  transform: translateY(-1px);
+}
+
+.settings-icon-button:active {
+  transform: translateY(0);
   box-shadow: 0 0 0 4px hsl(18 68% 42% / 0.12), 0 2px 6px hsl(220 20% 12% / 0.14);
 }
 
