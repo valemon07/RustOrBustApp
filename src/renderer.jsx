@@ -10,6 +10,7 @@ import { createRoot } from 'react-dom/client';
 import CenterPanel from './Components/CenterPanel';
 import { ThemeProvider, ThemeSwitcherUI } from './Components/ThemeSwitcher';
 import { SettingsProvider } from './contexts/SettingsContext';
+import TestModal from './Components/FlaggedImagesModal.test'; // For
 
 
 // Defines the App component which will contain the rest of the components in the app.
@@ -33,6 +34,7 @@ const App = () => {
           <ThemeSwitcherUI />
         </div>
       </ThemeProvider>
+      {/* <TestModal></TestModal> */}
     </SettingsProvider>
   )
 };
