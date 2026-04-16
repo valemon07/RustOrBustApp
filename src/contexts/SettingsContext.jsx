@@ -6,6 +6,7 @@ const DEFAULT_SETTINGS = {
   scaleBreakpointHigh: 4.0,
   edgeReclassificationThreshold: 0.5,
   surfacePitDarknessThreshold: 0.3,
+  exposureGamma: 1,
   customThresholds: [], // Array of floats sent to backend
 };
 

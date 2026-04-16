@@ -132,6 +132,7 @@
   color: var(--picker-muted);
 }
 
+
 .setting-item-right input[type="number"] {
   width: 120px;
   padding: 8px 10px;
@@ -268,4 +269,27 @@
   background: var(--picker-primary);
   color: white;
   border-color: var(--picker-primary);
+}
+
+.input-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  position: relative;
+}
+
+.input-wrapper input[type="number"].input-error {
+  border-color: #dc2626;
+  background-color: rgba(220, 38, 38, 0.05);
+}
+
+.input-wrapper input[type="number"].input-error:focus {
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.1);
+}
+
+.validation-error {
+  font-size: 0.8rem;
+  color: #dc2626;
+  font-weight: 500;
+  margin-top: 2px;
 }
