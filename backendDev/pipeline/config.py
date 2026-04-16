@@ -47,6 +47,18 @@ USE_CLAHE: bool = True
 CLAHE_CLIP_LIMIT: float = 2.0          # at high-mag; scaled down at overview
 CLAHE_TILE_GRID_SIZE: tuple[int, int] = (8, 8)
 
+# ---------------------------------------------------------------------------
+# Contrast sweep retry (Stage 2)
+# ---------------------------------------------------------------------------
+# When a mask is flagged as poor (roi_incomplete or mask_warning), Stage 2 is
+# re-run with gamma-corrected versions of the image. The best-scoring result
+# is used. Set to False to disable and always use the single-pass result.
+CONTRAST_SWEEP_ENABLED: bool = True
+# gamma < 1.0 → darkens image (corrects overexposure / saturation bleed)
+# gamma > 1.0 → brightens image (corrects underexposure / low coverage)
+# Darkening values listed first — saturation bleed is the more common issue.
+CONTRAST_SWEEP_GAMMAS: list[float] = [0.5, 1.0, 2.0, 3.0]
+
 # Mask fill-ratio quality thresholds.
 # fill_ratio = hull_mask_pixels / bounding_box_pixels
 # Values outside [LOW, HIGH] receive a warning flag in the CSV.

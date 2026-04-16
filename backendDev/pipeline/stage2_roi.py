@@ -42,6 +42,7 @@ from pipeline.config import (
     ROI_GRID_HIGH_FILL, ROI_GRID_LOW_FILL,
     ROI_MIN_DIM_FRACTION,
     ROI_INCOMPLETE_LOW_FILL,
+    CONTRAST_SWEEP_ENABLED, CONTRAST_SWEEP_GAMMAS,
 )
 from pipeline.pipeline_flags import (
     PipelineFlag, MASK_ROI_INCOMPLETE, SEVERITY_ERROR,
@@ -84,6 +85,81 @@ def _load_image(image_input):
             raise FileNotFoundError(f"Cannot load image: {image_input}")
         return image
     return image_input.copy()
+
+
+def apply_gamma(image_bgr: np.ndarray, gamma: float) -> np.ndarray:
+    """Gamma-correct a BGR uint8 image via a 256-entry LUT.
+
+    gamma < 1.0 → darkens (compresses highlights / corrects overexposure)
+    gamma > 1.0 → brightens (lifts shadows / corrects underexposure)
+    gamma == 1.0 → returns a copy with no change
+    """
+    if gamma == 1.0:
+        return image_bgr.copy()
+    inv_gamma = 1.0 / gamma
+    lut = np.array(
+        [((i / 255.0) ** inv_gamma) * 255.0 for i in range(256)],
+        dtype=np.uint8,
+    )
+    return cv2.LUT(image_bgr, lut)
+
+
+def extract_roi_contrast_sweep(
+    image_input,
+    scale_um_per_px: float = 1.0,
+    gamma_values: list[float] | None = None,
+):
+    """Run extract_roi with each gamma; return the result with the largest mask area.
+
+    Tries every gamma in gamma_values (which should include 1.0 for the original
+    image). The winner is whichever gamma produces the largest hull pixel count
+    (mask_fill_ratio × bounding_box_area). More coverage is always better.
+
+    The returned roi_dims dict gains two extra keys:
+      contrast_gamma_used   (float) — gamma that produced the largest hull
+      contrast_gammas_tried (int)   — total gammas attempted
+    """
+    if gamma_values is None:
+        gamma_values = CONTRAST_SWEEP_GAMMAS
+
+    base_image = _load_image(image_input)
+
+    def _hull_px(rd: dict) -> float:
+        """Estimated hull pixel count = bbox_area × fill_ratio."""
+        return rd.get("width_px", 0) * rd.get("height_px", 0) * rd.get("mask_fill_ratio", 0.0)
+
+    def _run(gamma: float):
+        return extract_roi(apply_gamma(base_image, gamma), scale_um_per_px)
+
+    best_result  = None
+    best_hull    = -1.0
+    best_gamma   = 1.0
+    gammas_tried = 0
+
+    for gamma in gamma_values:
+        gammas_tried += 1
+        try:
+            candidate = _run(gamma)
+        except Exception:
+            # Extreme gammas can collapse contrast so badly that no bright
+            # region survives thresholding — treat as a failed attempt.
+            continue
+        _, _, cdims, _ = candidate
+        hull = _hull_px(cdims)
+        if hull > best_hull:
+            best_hull   = hull
+            best_result = candidate
+            best_gamma  = gamma
+
+    # Fallback: if all gammas failed (extreme edge case), run baseline.
+    if best_result is None:
+        best_result = _run(1.0)
+        best_gamma  = 1.0
+
+    hull_mask, specimen_crop, roi_dims, debug_vis = best_result
+    roi_dims["contrast_gamma_used"]   = best_gamma
+    roi_dims["contrast_gammas_tried"] = gammas_tried
+    return hull_mask, specimen_crop, roi_dims, debug_vis
 
 
 def _largest_bright_contour(binary_mask):
