@@ -31,7 +31,7 @@ import numpy as np
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from pipeline.stage1_scale_bar     import detect_scale_bar, ScaleBarNotFoundError
-from pipeline.stage2_roi           import extract_roi
+from pipeline.stage2_roi           import extract_roi, extract_roi_contrast_sweep
 from pipeline.stage3_pit_detection import (
     detect_pits,
     MIN_PIT_AREA_UM2, MAX_PIT_AREA_UM2_SURFACE, MAX_PIT_AREA_UM2_EDGE,
@@ -44,7 +44,9 @@ from pipeline.stage3_pit_detection import (
 from pipeline.stage4_density       import calculate_density
 from pipeline.config               import (MANUAL_SCALE_OVERRIDES,
                                            NO_SCALE_BAR_IMAGES,
-                                           EXCLUDED_SPECIMENS)
+                                           EXCLUDED_SPECIMENS,
+                                           CONTRAST_SWEEP_ENABLED,
+                                           CONTRAST_SWEEP_GAMMAS)
 
 ROOT    = os.path.join(os.path.dirname(__file__), "..")
 RAW_DIR = os.path.join(ROOT, "data", "raw")
@@ -176,6 +178,7 @@ def _run_one(image_path):
         "mask_warning":        None,
         "roi_incomplete":      False,
         "roi_flags":           [],
+        "contrast_gamma_used": 1.0,
         "excluded":            False,
         "no_scale_bar":        False,
         "error":               None,
@@ -204,14 +207,20 @@ def _run_one(image_path):
         base["scale_um_per_px"] = scale
         base["scale_bar_um"]    = um_value
 
-        specimen_mask, _, roi_dims, stage2_vis = extract_roi(image_path, scale)
-        base["roi_width_um"]    = roi_dims["width_um"]
-        base["roi_height_um"]   = roi_dims["height_um"]
-        base["mask_fill_ratio"] = roi_dims["mask_fill_ratio"]
-        base["mask_warning"]    = roi_dims["mask_warning"]
-        base["roi_incomplete"]  = roi_dims["roi_incomplete"]
-        base["roi_flags"]       = roi_dims["pipeline_flags"]
-        base["_stage2_vis"]     = stage2_vis
+        if CONTRAST_SWEEP_ENABLED:
+            specimen_mask, _, roi_dims, stage2_vis = extract_roi_contrast_sweep(
+                image_path, scale_um_per_px=scale
+            )
+        else:
+            specimen_mask, _, roi_dims, stage2_vis = extract_roi(image_path, scale)
+        base["roi_width_um"]       = roi_dims["width_um"]
+        base["roi_height_um"]      = roi_dims["height_um"]
+        base["mask_fill_ratio"]    = roi_dims["mask_fill_ratio"]
+        base["mask_warning"]       = roi_dims["mask_warning"]
+        base["roi_incomplete"]     = roi_dims["roi_incomplete"]
+        base["roi_flags"]          = roi_dims["pipeline_flags"]
+        base["contrast_gamma_used"] = roi_dims.get("contrast_gamma_used", 1.0)
+        base["_stage2_vis"]        = stage2_vis
 
         confirmed, rejected, stage3_vis = detect_pits(
             image_path, scale, specimen_mask, roi_dims
@@ -510,6 +519,7 @@ CSV_FIELDS = [
     "roi_width_um", "roi_height_um",
     "mask_fill_ratio", "mask_warning",
     "roi_incomplete", "roi_flags",
+    "contrast_gamma_used",
     "macro_pit_count", "macro_density_per_cm",
     "full_pit_count", "full_density_per_cm",
     "pit_count", "pit_density_per_cm2",
@@ -539,6 +549,7 @@ def _write_csv(out_dir, rows):
                 "mask_warning":         row["mask_warning"]    or "",
                 "roi_incomplete":       "True" if row["roi_incomplete"] else "False",
                 "roi_flags":            _flags_to_json(row["roi_flags"]),
+                "contrast_gamma_used":  row.get("contrast_gamma_used", 1.0),
                 "macro_pit_count":      row["macro_pit_count"],
                 "macro_density_per_cm": row["macro_density_per_cm"],
                 "full_pit_count":       row["full_pit_count"],
