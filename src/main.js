@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
+import fs from 'node:fs';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -75,4 +76,26 @@ ipcMain.handle('dialog:openFile', async () => {
     ]
   });
   return result; // { canceled, filePaths }
+});
+
+ipcMain.handle('file:readImageAsDataUrl', async (event, filePath) => {
+  try {
+    const data = fs.readFileSync(filePath);
+    const base64 = data.toString('base64');
+    
+    // Determine image type from extension
+    const ext = path.extname(filePath).toLowerCase();
+    const mimeType = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.gif': 'image/gif',
+      '.webp': 'image/webp',
+    }[ext] || 'image/jpeg';
+    
+    return `data:${mimeType};base64,${base64}`;
+  } catch (err) {
+    console.error('Error reading image:', err);
+    throw err;
+  }
 });

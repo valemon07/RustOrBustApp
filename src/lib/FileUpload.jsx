@@ -1,6 +1,9 @@
-import React from "react";
+import React, { useState } from "react";
+import FlaggedImagesModal from "../Components/FlaggedImagesModal";
 
 export default function FileUpload({ className, isDragging = false }) {
+  const [flaggedImages, setFlaggedImages] = useState([]);
+  const [showModal, setShowModal] = useState(false);
   
   // Function to send files to the backend
   // Takes in a files array, which could be a list of filePaths or Files
@@ -118,6 +121,61 @@ export default function FileUpload({ className, isDragging = false }) {
     return combined;
   }
   
+  // Parse CSV to extract flagged images
+  const parseFlaggedImages = (csvText) => {
+    if (!csvText) return [];
+
+    const lines = csvText.split(/\r?\n/).filter(line => line.trim());
+    if (lines.length < 2) return [];
+
+    // Find header row
+    const headerLine = lines[0];
+    const headers = headerLine.split(",").map(h => h.trim());
+    
+    const filenameIndex = headers.indexOf("filename");
+    const rejectionDetailIndex = headers.indexOf("rejection_detail");
+    const failedRulesIndex = headers.indexOf("failed_rules");
+
+    if (filenameIndex === -1) return [];
+
+    // Group by filename
+    const flaggedMap = {};
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i];
+      if (!line.trim()) continue;
+
+      // Simple CSV parsing - handles basic comma separation
+      const parts = line.split(",");
+      if (parts.length < 1) continue;
+
+      const filename = parts[filenameIndex]?.trim() || "";
+      const rejectionDetail = parts[rejectionDetailIndex]?.trim() || "";
+      const failedRules = parts[failedRulesIndex]?.trim() || "";
+
+      if (filename && rejectionDetail) {
+        if (!flaggedMap[filename]) {
+          flaggedMap[filename] = [];
+        }
+        
+        // Parse failed rules to extract rule names
+        const rules = failedRules.split(";").map(r => r.trim()).filter(Boolean);
+        rules.forEach(rule => {
+          flaggedMap[filename].push({
+            rule: rule,
+            detail: rejectionDetail
+          });
+        });
+      }
+    }
+
+    // Convert to array with file paths
+    return Object.entries(flaggedMap).map(([filename, rejectionReasons]) => ({
+      filename,
+      filepath: filename, // This will be updated by backend to provide actual path
+      rejectionReasons
+    }));
+  };
+
   // call for FileList from drop or array of File objects
   const handleDropFiles = async (fileList) => {
     const combinedCsv = await uploadFilesParallel(fileList, {
@@ -131,6 +189,43 @@ export default function FileUpload({ className, isDragging = false }) {
     });
   
     if (combinedCsv) {
+      // Parse flagged images from CSV
+      const flagged = parseFlaggedImages(combinedCsv);
+      
+      // Also fetch flagged images info from backend
+      try {
+        const response = await fetch("http://localhost:5001/flagged-images");
+        if (response.ok) {
+          const data = await response.json();
+          if (data.flaggedImages && data.flaggedImages.length > 0) {
+            // Use backend flagged images if available
+            const enhancedFlagged = data.flaggedImages.map(item => ({
+              filename: item.filename,
+              filepath: item.filename, // Will be updated to actual path
+              rejectionReasons: item.reasons || [{ rule: "Unknown", detail: item.reason || "Flagged during analysis" }]
+            }));
+            setFlaggedImages(enhancedFlagged);
+            setShowModal(true);
+          } else if (flagged.length > 0) {
+            // Fall back to CSV parsing if no backend data
+            setFlaggedImages(flagged);
+            setShowModal(true);
+          }
+        } else if (flagged.length > 0) {
+          // Fall back to CSV parsing
+          setFlaggedImages(flagged);
+          setShowModal(true);
+        }
+      } catch (err) {
+        console.error("Error fetching flagged images:", err);
+        // Fall back to CSV parsing
+        if (flagged.length > 0) {
+          setFlaggedImages(flagged);
+          setShowModal(true);
+        }
+      }
+
+      // Download CSV
       const blob = new Blob([combinedCsv], { type: "text/csv" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -174,20 +269,28 @@ export default function FileUpload({ className, isDragging = false }) {
   }
 
   return (
-    <div
-      className={`${className} ${isDragging ? "dragging" : ""}`}
-      onClick={clickHandler}
-      onDragOver={onDragOver}
-      onDrop={onDrop}>
-      <img
-        src="/src/assets/folder-open-solid-full.svg"
-        alt="Folder Icon"
-        className="upload-icon"
-      />
-      <p className="upload-copy">{isDragging ? "Drag here." : "Drop files here or click to browse"}</p>
-      <p className="upload-subcopy">
-        {isDragging ? "Release to start analysis" : "Supports multiple images and exports one CSV"}
-      </p>
-    </div>
+    <>
+      {showModal && (
+        <FlaggedImagesModal 
+          flaggedImages={flaggedImages} 
+          onClose={() => setShowModal(false)}
+        />
+      )}
+      <div
+        className={`${className} ${isDragging ? "dragging" : ""}`}
+        onClick={clickHandler}
+        onDragOver={onDragOver}
+        onDrop={onDrop}>
+        <img
+          src="/src/assets/folder-open-solid-full.svg"
+          alt="Folder Icon"
+          className="upload-icon"
+        />
+        <p className="upload-copy">{isDragging ? "Drag here." : "Drop files here or click to browse"}</p>
+        <p className="upload-subcopy">
+          {isDragging ? "Release to start analysis" : "Supports multiple images and exports one CSV"}
+        </p>
+      </div>
+    </>
   );
 }
