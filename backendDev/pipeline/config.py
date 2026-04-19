@@ -63,7 +63,7 @@ CONTRAST_SWEEP_GAMMAS: list[float] = [0.5, 1.0, 2.0, 3.0]
 # fill_ratio = hull_mask_pixels / bounding_box_pixels
 # Values outside [LOW, HIGH] receive a warning flag in the CSV.
 MASK_FILL_LOW_THRESHOLD: float  = 0.02   # nearly empty → segmentation likely failed
-MASK_FILL_HIGH_THRESHOLD: float = 0.85   # nearly full bbox → background may be included
+MASK_FILL_HIGH_THRESHOLD: float = 0.97   # nearly full bbox → background may be included
 
 # ---------------------------------------------------------------------------
 # MASK_ROI_INCOMPLETE flag thresholds (Stage 2)
@@ -84,6 +84,22 @@ ROI_MIN_DIM_FRACTION: float = 0.25
 
 # Check 5 — low fill ratio that also raises MASK_ROI_INCOMPLETE
 ROI_INCOMPLETE_LOW_FILL: float = 0.04
+
+# ---------------------------------------------------------------------------
+# Edge classification
+# ---------------------------------------------------------------------------
+# Fraction of a candidate's pixel area that must overlap the hull boundary
+# buffer zone for the candidate to be classified as an edge pit.
+# Shared by Stage 2 (initial classification) and Stage 3 (reclassification
+# safety net).  Change here propagates to both stages automatically.
+EDGE_OVERLAP_THRESHOLD: float = 0.60
+
+# Physical width of the hull boundary buffer zone in µm.
+# Converted to pixels at runtime: edge_buffer_px = round(EDGE_BUFFER_UM / scale).
+# None = fall back to the pixel-based constant HULL_BOUNDARY_DILATION_PX (5 px)
+# defined in stage2_roi and stage3_pit_detection, preserving pre-2026-04-16 behavior.
+# Override per image via data/image_overrides.json: {"stem": {"edge_buffer_um": N}}.
+EDGE_BUFFER_UM: float | None = None
 
 # ---------------------------------------------------------------------------
 # Excluded specimens

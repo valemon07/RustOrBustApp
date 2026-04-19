@@ -130,7 +130,7 @@ def _diag_one(filename):
         print("    R6 not activated — all R1-R5 passers are confirmed.")
 
     # ── Final confirmed count by tier ────────────────────────────────────────
-    confirmed, rejected, _ = detect_pits(path, scale, specimen_mask, roi_dims)
+    confirmed, rejected, _, _ = detect_pits(path, scale, specimen_mask, roi_dims)
     macro_count = sum(1 for p in confirmed if p.get("pit_tier") == "macro")
     micro_count = sum(1 for p in confirmed if p.get("pit_tier") == "micro")
     print(f"\n  Final: confirmed={len(confirmed)} "
