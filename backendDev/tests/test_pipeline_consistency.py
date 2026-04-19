@@ -179,7 +179,7 @@ def _run_pipeline(image_path):
         result["roi_flags"]       = roi_dims["pipeline_flags"]
 
         # Stage 3
-        confirmed_pits, rejected_candidates, _ = detect_pits(
+        confirmed_pits, rejected_candidates, _, _ = detect_pits(
             image_path, scale_um_per_px, specimen_mask, roi_dims
         )
         result["full_pit_count"] = len(confirmed_pits)
@@ -224,7 +224,7 @@ def _save_flagged_debug(image_path, flag_tag):
     try:
         scale_um_per_px, _, _ = detect_scale_bar(image_path)
         specimen_mask, _, roi_dims, _ = extract_roi(image_path, scale_um_per_px)
-        confirmed_pits, _, _ = detect_pits(
+        confirmed_pits, _, _, _ = detect_pits(
             image_path, scale_um_per_px, specimen_mask, roi_dims
         )
         _, _, _, debug_vis = calculate_density(

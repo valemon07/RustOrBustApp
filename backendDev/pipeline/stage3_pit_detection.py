@@ -44,6 +44,8 @@ import math
 import cv2
 import numpy as np
 
+from pipeline.config import EDGE_OVERLAP_THRESHOLD, EDGE_BUFFER_UM
+
 
 # ---------------------------------------------------------------------------
 # Tuneable constants
@@ -54,11 +56,17 @@ CLAHE_TILE_GRID   = (8, 8)
 BLUR_KERNEL_SIZE  = 5
 
 MIN_PIT_AREA_UM2               = 10.0       # R1 — absolute floor (sub-resolution noise)
-MAX_PIT_AREA_UM2_SURFACE       = 150_000.0  # R2 — interior pits: raised from 50 k → 150 k
-                                            #      to match edge-pit ceiling and accommodate
-                                            #      large real corrosion features at overview
-                                            #      scale (~4.2 µm/px) where 50 k µm² = only
-                                            #      a 53×53 px region.
+MAX_PIT_AREA_UM2_SURFACE       = 500_000.0  # R2 — interior pits: raised from 150 k → 500 k
+                                            #      (2026-04-17) to admit very large coalesced
+                                            #      surface corrosion zones.  Diagnostic data
+                                            #      shows genuine surface pits reaching
+                                            #      200–250 k µm² on severely corroded specimens
+                                            #      (e.g. CR3-9_9-side_pit005: 245 618 µm²).
+                                            #      Reclassified pits already use 500 k µm²;
+                                            #      aligning surface pits to the same ceiling
+                                            #      is safe because the hull mask excludes all
+                                            #      background regions, and R3/R7 remain active
+                                            #      guards against scratches.
 MAX_PIT_AREA_UM2_EDGE          = 150_000.0  # R2 — edge pits: raised ceiling; edge pits
                                             #      wrap the curved hole boundary and can
                                             #      span much larger areas than interior pits.
@@ -74,19 +82,44 @@ MAX_PIT_AREA_UM2_RECLASSIFIED  = 500_000.0  # R2 — reclassified pits (edge→s
                                             #      Calibrated against largest observed real
                                             #      coalesced pit (~297 k µm²) with ~1.7×
                                             #      headroom.
+MAX_PIT_AREA_UM2_SURFACE_COARSE = 5_000_000.0 # R2 — raised surface ceiling at overview scale
+                                             #      (scale ≥ R3_SCALE_BREAKPOINT_HIGH = 4.0 µm/px).
+                                             #      At ~4.2 µm/px genuine coalesced corrosion
+                                             #      forms connected regions up to ~2.3 M µm²;
+                                             #      the fine-scale 500 k ceiling incorrectly
+                                             #      rejects all of them.  This higher ceiling
+                                             #      is safe at overview scale because:
+                                             #        (a) the hull mask excludes all background,
+                                             #        (b) R3/R7/R8 remain active guards,
+                                             #        (c) background-leakage artifacts at
+                                             #            scale 8–11 µm/px measure 14–22 M µm²
+                                             #            and still exceed this ceiling.
+                                             #      Calibrated against the largest confirmed
+                                             #      genuine overview pit (~2.3 M µm²) with
+                                             #      ~2× headroom.
 MAX_ASPECT_RATIO               = 8.0        # R3 — polishing scratch (small/medium pits)
-MAX_ASPECT_RATIO_LARGE_PIT     = 12.0       # R3 — relaxed for large pits (≥ LARGE_PIT_AREA_UM2)
-                                            #      Large real pits can be elongated without
-                                            #      being scratches; 12.0 still blocks true
-                                            #      polishing streaks.
+MAX_ASPECT_RATIO_LARGE_PIT     = 14.0       # R3 — relaxed for large pits (≥ LARGE_PIT_AREA_UM2)
+                                            #      Large real pits can be elongated crevices
+                                            #      or coalesced damage; raised from 12→14 to
+                                            #      recover confirmed interior pits at ~14 aspect
+                                            #      that are dark and irregular (not scratches).
 MIN_CIRCULARITY                = 0.08       # R4 — interior pits only; edge pits are exempt
                                             #      because their contours wrap the curved hole
                                             #      boundary, giving inherently low circularity
                                             #      regardless of pit quality.
-MIN_CIRCULARITY_LARGE_PIT      = 0.04       # R4 — relaxed for large pits (≥ LARGE_PIT_AREA_UM2)
+MIN_CIRCULARITY_LARGE_PIT      = 0.005      # R4 — relaxed for large pits (≥ LARGE_PIT_AREA_UM2)
                                             #      Large real corrosion damage can be
-                                            #      very irregular; 0.04 still excludes
-                                            #      near-linear scratches.
+                                            #      very irregular — multi-lobed, branching
+                                            #      pit clusters have circularity << 0.04.
+                                            #      Safe to lower because R3 (aspect ≤ 14)
+                                            #      and R7 (darkness) remain active guards:
+                                            #      a scratch barely passing R3 has theoretical
+                                            #      minimum circularity ≈ π/14 ≈ 0.224,
+                                            #      well above this floor.
+                                            #      Diagnostic data shows genuine large pits
+                                            #      reaching circ ≈ 0.005–0.009 on severely
+                                            #      corroded specimens (CR3-8, CR3-9).
+                                            #      Lowered from 0.04 → 0.01 → 0.005 (2026-04-17).
 MIN_CIRCULARITY_FINE           = 0.12       # R4 — tighter floor for small pits at fine scale
                                             #      (< R4_SCALE_BREAKPOINT µm/px).  At fine scale
                                             #      real pits are well-resolved and appear rounder;
@@ -94,6 +127,28 @@ MIN_CIRCULARITY_FINE           = 0.12       # R4 — tighter floor for small pit
                                             #      intersection blobs) tend to have circularity
                                             #      0.05–0.10 and are caught by this higher floor.
 R4_SCALE_BREAKPOINT            = 1.5        # µm/px; below this, MIN_CIRCULARITY_FINE applies
+MEDIUM_PIT_AREA_UM2_FINE       = 400.0      # R4 — at fine scale (< R4_SCALE_BREAKPOINT),
+                                            #      pits with area ≥ this threshold use
+                                            #      MIN_CIRCULARITY_MEDIUM_FINE (0.03) instead of
+                                            #      the strict MIN_CIRCULARITY_FINE (0.12).
+                                            #      The strict 0.12 floor was calibrated for
+                                            #      small noise features (grain-boundary patches,
+                                            #      scratch blobs) that are typically < 400 µm².
+                                            #      Pits above 400 µm² at fine scale are real
+                                            #      features whose contours may be inflated by
+                                            #      the hull boundary or genuine morphological
+                                            #      complexity — the lower floor applies.
+MIN_CIRCULARITY_MEDIUM_FINE    = 0.03       # R4 — floor for medium pits at fine scale
+                                            #      (area ≥ MEDIUM_PIT_AREA_UM2_FINE AND
+                                            #      scale < R4_SCALE_BREAKPOINT).
+                                            #      Diagnostic data shows BF005's largest
+                                            #      surface pit (633 µm²) has circ=0.0321;
+                                            #      the standard 0.08 floor incorrectly rejects
+                                            #      it.  Lowered to 0.03 to admit genuinely
+                                            #      complex medium pits at extreme fine scale
+                                            #      (0.15 µm/px) that are outside the normal
+                                            #      operating range.  R7 (darkness ≤ 0.85)
+                                            #      and R3 (aspect ≤ 8) remain active guards.
 MAX_INTENSITY_RATIO            = 0.85       # R7 — surface pits only: darkness confirmation.
                                             #      Tightened from 0.92 → 0.85 because
                                             #      confirmed real pits never exceed 0.69,
@@ -114,6 +169,17 @@ R5_PHYSICAL_MIN_AREA_UM2  = 78.5       # R5 — hard physical floor: π × (5 µ
                                        #      scales.  Without this, the formula
                                        #      max(84/scale, 15×scale²) hits a valley of ~47 µm²
                                        #      at scale ≈ 1.77 µm/px — below the physical min.
+R5_FORMULA_CAP_UM2        = 200.0      # R5 — upper cap on the SCALE_AWARE_AREA_COEFF / scale
+                                       #      term.  The formula was calibrated for the normal
+                                       #      operating range (0.5–4.2 µm/px); at very fine
+                                       #      scales outside this range (e.g. 0.15 µm/px) it
+                                       #      grows to ~543 µm² — nearly 7× the physical min —
+                                       #      and incorrectly rejects real pits.  Capping at
+                                       #      200 µm² (≈ 2.5× physical min) prevents this while
+                                       #      leaving the formula unchanged across the expected
+                                       #      scale range (at 0.5 µm/px the term is 168 µm²,
+                                       #      still below 200 µm², so only truly out-of-range
+                                       #      images are affected).
 MIN_PIXEL_COUNT           = 15         # R5 — pixel-count floor, fine/medium scale
                                        #      (scale < R5_COARSE_BREAKPOINT)
                                        #        15 px × (1.05 µm/px)² = 16.5 µm²  (fine)
@@ -165,13 +231,12 @@ SCALEBAR_Y_FRACTION = 0.80
 HULL_BOUNDARY_DILATION_PX = 5
 
 # Edge-to-surface reclassification threshold.
+# Imported from config as EDGE_OVERLAP_THRESHOLD (0.60) — single source of truth
+# shared with Stage 2's initial classification.
 # An edge candidate is reclassified as a surface pit when the fraction of its
-# area that falls inside the boundary zone is ≤ this value — i.e., the majority
-# of the pit is interior.  The old binary "any touch → edge" rule was too
-# aggressive for large finger-like pits that originate at the fastener-hole edge
-# but extend deep into the specimen surface.
+# area that falls inside the boundary zone is < EDGE_OVERLAP_THRESHOLD, i.e.
+# the majority of the pit is interior.
 # For large pits (≥ LARGE_PIT_AREA_UM2) a centroid test is also applied.
-EDGE_RECLASSIFY_BOUNDARY_FRACTION = 0.60
 
 # R8 — dominant-orientation scratch rejection
 # A surface candidate is rejected as a scratch segment when its major axis
@@ -264,7 +329,7 @@ def _contour_from_mask(candidate_mask):
     return max(contours, key=cv2.contourArea)
 
 
-def _compute_boundary_zone(specimen_mask):
+def _compute_boundary_zone(specimen_mask, edge_buffer_px: int | None = None):
     """
     Recompute the hull-boundary proximity zone from the filled specimen mask.
 
@@ -272,11 +337,18 @@ def _compute_boundary_zone(specimen_mask):
     can measure how much of any candidate overlaps the boundary zone without
     importing from Stage 2.
 
-    Returns uint8 mask: 255 = within HULL_BOUNDARY_DILATION_PX pixels of the hull edge.
+    Parameters
+    ----------
+    specimen_mask  : uint8 mask, 255 = inside hull
+    edge_buffer_px : dilation radius in pixels.  None falls back to the static
+                     HULL_BOUNDARY_DILATION_PX constant (5 px).
+
+    Returns uint8 mask: 255 = within edge_buffer_px pixels of the hull edge.
     """
-    eroded = cv2.erode(specimen_mask, np.ones((3, 3), np.uint8), iterations=1)
+    _buf     = edge_buffer_px if edge_buffer_px is not None else HULL_BOUNDARY_DILATION_PX
+    eroded   = cv2.erode(specimen_mask, np.ones((3, 3), np.uint8), iterations=1)
     hull_boundary = specimen_mask - eroded
-    dil_size = HULL_BOUNDARY_DILATION_PX * 2 + 1
+    dil_size = _buf * 2 + 1
     return cv2.dilate(
         hull_boundary,
         np.ones((dil_size, dil_size), np.uint8),
@@ -289,7 +361,7 @@ def _maybe_reclassify_edge(candidate, scale_um_per_px, boundary_zone):
     Return 'surface' if the candidate is predominantly interior to the specimen.
 
     Reclassification criteria (either is sufficient):
-    1. Area-fraction: ≤ EDGE_RECLASSIFY_BOUNDARY_FRACTION of the candidate's
+    1. Area-fraction: ≤ EDGE_OVERLAP_THRESHOLD of the candidate's
        pixels overlap the boundary zone.
     2. Centroid: for large pits (≥ LARGE_PIT_AREA_UM2 µm²), the centroid does
        not fall inside the boundary zone.
@@ -304,7 +376,7 @@ def _maybe_reclassify_edge(candidate, scale_um_per_px, boundary_zone):
     overlap_px        = int(np.count_nonzero(cv2.bitwise_and(mask, boundary_zone)))
     boundary_fraction = overlap_px / area_px
 
-    if boundary_fraction <= EDGE_RECLASSIFY_BOUNDARY_FRACTION:
+    if boundary_fraction < EDGE_OVERLAP_THRESHOLD:
         return "surface"
 
     area_um2 = area_px * (scale_um_per_px ** 2)
@@ -381,7 +453,8 @@ def _compute_dominant_orientation(gray, specimen_mask):
 def _process_candidate(candidate, pit_type, scale_um_per_px,
                         gray, mean_surface_intensity,
                         effective_min_area_um2,
-                        dominant_orientation=None):
+                        dominant_orientation=None,
+                        thresholds=None):
     """
     Measure one candidate region and test it against rules R1–R5.
 
@@ -466,6 +539,13 @@ def _process_candidate(candidate, pit_type, scale_um_per_px,
     intensity_ratio = (mean_intensity / mean_surface_intensity
                        if mean_surface_intensity > 0 else 0.0)
 
+    # --- Resolve per-image overrides (or fall back to module constants) -----
+    _th = thresholds or {}
+    _r3_base = _th.get("r3_max_aspect_ratio",    MAX_ASPECT_RATIO)
+    _r4_base = _th.get("r4_min_circularity",     MIN_CIRCULARITY)
+    _r7_base = _th.get("r7_max_intensity_ratio", MAX_INTENSITY_RATIO)
+    _r8_min  = _th.get("r8_min_aspect_ratio",    R8_MIN_ASPECT_RATIO)
+
     # --- Confirmation rules R1–R5 ----------------------------------------
     rejection_reasons = []
     if area_um2 < MIN_PIT_AREA_UM2:
@@ -478,50 +558,74 @@ def _process_candidate(candidate, pit_type, scale_um_per_px,
         rejection_reasons.append(
             f"R5:area {area_um2:.2f}µm² < scale-min {effective_min_area_um2:.1f}µm²"
         )
-    # R2 — area ceiling.  Three tiers:
-    #   edge pits         — 150 k µm² (wraps curved hole boundary)
-    #   reclassified pits — 500 k µm² (spatially confirmed interior by centroid/
-    #                                   area-fraction; large coalesced zones valid)
-    #   surface pits      — 150 k µm² (standard interior ceiling)
+    # R2 — area ceiling.  Four tiers:
+    #   edge pits                      — 150 k µm²  (wraps curved hole boundary)
+    #   surface/reclassified, coarse   — 5 M µm²    (scale ≥ 4.0 µm/px: genuine overview
+    #                                                 corrosion reaches ~2.3 M µm²)
+    #   reclassified pits, fine scale  — 500 k µm²  (spatially confirmed interior;
+    #                                                 large coalesced zones valid at fine scale)
+    #   surface pits, fine scale       — 500 k µm²  (standard interior ceiling)
     if pit_type == "edge":
-        max_area = MAX_PIT_AREA_UM2_EDGE
+        max_area = MAX_PIT_AREA_UM2_EDGE                  # 150 k — edge pits
+    elif scale_um_per_px >= R3_SCALE_BREAKPOINT_HIGH:     # ≥ 4.0 µm/px (overview scale)
+        max_area = MAX_PIT_AREA_UM2_SURFACE_COARSE        # 5 M — large coalesced interior pits
     elif candidate.get("reclassified_from_edge"):
-        max_area = MAX_PIT_AREA_UM2_RECLASSIFIED
+        max_area = MAX_PIT_AREA_UM2_RECLASSIFIED          # 500 k — reclassified (fine scale)
     else:
-        max_area = MAX_PIT_AREA_UM2_SURFACE
+        max_area = MAX_PIT_AREA_UM2_SURFACE               # 500 k — surface pit (fine scale)
     if area_um2 > max_area:
         rejection_reasons.append(
             f"R2:area {area_um2:.0f}µm² > max {max_area:.0f}µm²"
         )
     # R3 — aspect ratio: scale-adaptive ceiling for small/medium pits.
-    # Large pits (≥ LARGE_PIT_AREA_UM2) always use the relaxed 12.0 ceiling
-    # regardless of scale — coalesced damage is legitimately elongated.
+    # ALL edge pits are EXEMPT from R3 entirely.  Pits near the specimen
+    # boundary can only grow inward, creating natural elongation that is a
+    # geometric artifact of the boundary position — not evidence of a scratch.
+    # This is the same rationale for which R4 and R7 are already fully exempt
+    # for all edge pits.
+    # For large surface pits: use the relaxed 12.0 ceiling (coalesced damage
+    # can be elongated without being a scratch).
     # For small pits: tighten to 5.0 at scale > 4 µm/px where scratch segments
     # appear as short elongated blobs indistinguishable from micro-pits at
     # the standard 8.0 ceiling.
-    if area_um2 >= LARGE_PIT_AREA_UM2:
-        aspect_ceiling = MAX_ASPECT_RATIO_LARGE_PIT        # 12.0 — coalesced damage
-    elif scale_um_per_px >= R3_SCALE_BREAKPOINT_HIGH:      # ≥ 4.0 µm/px
-        aspect_ceiling = MAX_ASPECT_RATIO_COARSE           # 5.0  — overview/coarse
-    elif scale_um_per_px >= R3_SCALE_BREAKPOINT_LOW:       # 2.0–4.0 µm/px
-        aspect_ceiling = MAX_ASPECT_RATIO_MEDIUM           # 6.5  — medium scale
-    else:                                                  # < 2.0 µm/px
-        aspect_ceiling = MAX_ASPECT_RATIO                  # 8.0  — fine scale
-    if aspect_ratio > aspect_ceiling:
-        rejection_reasons.append(
-            f"R3:aspect {aspect_ratio:.2f} > max {aspect_ceiling}"
-        )
+    if pit_type != "edge":
+        # Scale-adaptive ceiling.  When an override is active, it acts as a
+        # uniform cap: min(constant, _r3_base) so the override can only
+        # tighten at medium/coarse scales (it can loosen at fine scale).
+        # Large pits are never affected by the R3 override — their elongation
+        # is genuine coalesced damage, not scratch fragments.
+        if area_um2 >= LARGE_PIT_AREA_UM2:
+            aspect_ceiling = MAX_ASPECT_RATIO_LARGE_PIT              # 14.0 — coalesced damage
+        elif scale_um_per_px >= R3_SCALE_BREAKPOINT_HIGH:            # ≥ 4.0 µm/px
+            aspect_ceiling = min(MAX_ASPECT_RATIO_COARSE, _r3_base)  # 5.0 or override
+        elif scale_um_per_px >= R3_SCALE_BREAKPOINT_LOW:             # 2.0–4.0 µm/px
+            aspect_ceiling = min(MAX_ASPECT_RATIO_MEDIUM, _r3_base)  # 6.5 or override
+        else:                                                         # < 2.0 µm/px
+            aspect_ceiling = _r3_base                                 # fine scale base
+        if aspect_ratio > aspect_ceiling:
+            rejection_reasons.append(
+                f"R3:aspect {aspect_ratio:.2f} > max {aspect_ceiling}"
+            )
     # R4 — circularity: interior pits only.  Edge pits wrap the curved hole
     # boundary and always have low circularity by geometry, not because they
     # are noise.  Applying R4 to edge pits would reject real large pits.
     # Large surface pits can be very irregular; a relaxed floor applies when
     # area ≥ LARGE_PIT_AREA_UM2 to avoid discarding genuine macro damage.
+    # R4 override (_r4_base) replaces the standard floor (0.08) and is also
+    # applied to the fine-scale tiers proportionally.  The large-pit domain
+    # floor (MIN_CIRCULARITY_LARGE_PIT = 0.005) is intentionally NOT affected
+    # by the override: it is a domain-calibrated value for genuine macro
+    # coalesced damage.  To reject large-pit false positives use R3 or R7
+    # overrides, or morph_open_kernel_px in Stage 2.
     if area_um2 >= LARGE_PIT_AREA_UM2:
-        circ_floor = MIN_CIRCULARITY_LARGE_PIT           # 0.04 — large pits can be irregular
+        circ_floor = MIN_CIRCULARITY_LARGE_PIT           # 0.005 — domain-fixed, not overridden
     elif scale_um_per_px < R4_SCALE_BREAKPOINT:          # < 1.5 µm/px (fine scale)
-        circ_floor = MIN_CIRCULARITY_FINE                # 0.12 — real pits are rounder here
+        if area_um2 >= MEDIUM_PIT_AREA_UM2_FINE:
+            circ_floor = MIN_CIRCULARITY_MEDIUM_FINE     # 0.03
+        else:
+            circ_floor = MIN_CIRCULARITY_FINE            # 0.12
     else:
-        circ_floor = MIN_CIRCULARITY                     # 0.08 — standard
+        circ_floor = _r4_base                            # standard tier: use override
     if pit_type != "edge" and circularity < circ_floor:
         rejection_reasons.append(
             f"R4:circ {circularity:.4f} < min {circ_floor}"
@@ -534,14 +638,18 @@ def _process_candidate(candidate, pit_type, scale_um_per_px,
     # or scratch remnants than genuine pits.
     # Interpolate linearly between the two breakpoints.
     # Edge pits are exempt — illumination mixes at the hole boundary.
+    # _r7_base replaces MAX_INTENSITY_RATIO as the fine-scale ceiling.
+    # The coarse end is always ≤ _r7_base (a tighter override also tightens
+    # the coarse end; the interpolation cannot exceed the override).
     if scale_um_per_px <= R7_SCALE_BREAKPOINT_LOW:
-        r7_threshold = MAX_INTENSITY_RATIO
+        r7_threshold = _r7_base
     elif scale_um_per_px >= R7_SCALE_BREAKPOINT_HIGH:
-        r7_threshold = MAX_INTENSITY_RATIO_COARSE
+        r7_threshold = min(MAX_INTENSITY_RATIO_COARSE, _r7_base)
     else:
         t = ((scale_um_per_px - R7_SCALE_BREAKPOINT_LOW) /
              (R7_SCALE_BREAKPOINT_HIGH - R7_SCALE_BREAKPOINT_LOW))
-        r7_threshold = MAX_INTENSITY_RATIO + t * (MAX_INTENSITY_RATIO_COARSE - MAX_INTENSITY_RATIO)
+        r7_threshold = _r7_base + t * (MAX_INTENSITY_RATIO_COARSE - MAX_INTENSITY_RATIO)
+        r7_threshold = min(r7_threshold, _r7_base)   # cap: override always wins at fine end
     if pit_type != "edge" and intensity_ratio >= r7_threshold:
         rejection_reasons.append(
             f"R7:intensity_ratio {intensity_ratio:.4f} >= max {r7_threshold:.3f}"
@@ -565,7 +673,7 @@ def _process_candidate(candidate, pit_type, scale_um_per_px,
     if (pit_type == "surface"
             and not candidate.get("reclassified_from_edge")
             and dominant_orientation is not None
-            and aspect_ratio > R8_MIN_ASPECT_RATIO
+            and aspect_ratio > _r8_min
             and area_um2 < r8_area_cap):
         delta = abs(pit_angle_deg - dominant_orientation)
         delta = min(delta, 180.0 - delta)
@@ -596,6 +704,7 @@ def _process_candidate(candidate, pit_type, scale_um_per_px,
         "mean_intensity":  round(mean_intensity, 2),
         "intensity_ratio": round(intensity_ratio, 4),
         "pit_angle_deg":   round(pit_angle_deg,   1),
+        "edge_overlap_fraction": round(candidate.get("edge_overlap_fraction", 0.0), 4),
         "contour":         contour,
         "rejection_reasons": rejection_reasons,
     }
@@ -686,7 +795,7 @@ def _build_debug_vis(image, confirmed_pits, rejected_candidates,
 # ---------------------------------------------------------------------------
 
 def detect_pits(image_input, scale_um_per_px, specimen_mask, roi_dims,
-                verbose=False):
+                verbose=False, edge_buffer_px=None, overrides=None):
     """
     Refine Stage 2 candidates into confirmed, measured corrosion pits.
 
@@ -739,6 +848,19 @@ def detect_pits(image_input, scale_um_per_px, specimen_mask, roi_dims,
         gray, specimen_mask, all_candidates
     )
 
+    # --- 2b. Resolve per-image rule overrides --------------------------------
+    # Overrides allow the frontend to tighten (or loosen) individual rule
+    # thresholds on a per-image basis without changing module-level constants.
+    # Each override key replaces the base threshold; scale-adaptive logic in
+    # _process_candidate then applies on top of the overridden value.
+    _ov = overrides or {}
+    thresholds = {
+        "r3_max_aspect_ratio":    _ov.get("r3_max_aspect_ratio",    MAX_ASPECT_RATIO),
+        "r4_min_circularity":     _ov.get("r4_min_circularity",     MIN_CIRCULARITY),
+        "r7_max_intensity_ratio": _ov.get("r7_max_intensity_ratio", MAX_INTENSITY_RATIO),
+        "r8_min_aspect_ratio":    _ov.get("r8_min_aspect_ratio",    R8_MIN_ASPECT_RATIO),
+    }
+
     # --- 3. Rules R1–R5: per-candidate geometric filters -------------------
     # R5 scale-aware floor: effective minimum grows as magnification increases
     # (smaller µm/px → finer resolution → more noise features resolved).
@@ -749,10 +871,12 @@ def detect_pits(image_input, scale_um_per_px, specimen_mask, roi_dims,
                 if scale_um_per_px >= R5_COARSE_BREAKPOINT
                 else MIN_PIXEL_COUNT)
     pixel_floor_um2 = px_count * (scale_um_per_px ** 2)
-    effective_min_area_um2 = max(MIN_PIT_AREA_UM2,
-                                 R5_PHYSICAL_MIN_AREA_UM2,
-                                 SCALE_AWARE_AREA_COEFF / scale_um_per_px,
-                                 pixel_floor_um2)
+    effective_min_area_um2 = max(
+        MIN_PIT_AREA_UM2,
+        R5_PHYSICAL_MIN_AREA_UM2,
+        min(SCALE_AWARE_AREA_COEFF / scale_um_per_px, R5_FORMULA_CAP_UM2),
+        pixel_floor_um2,
+    )
 
     tagged_candidates = (
         [(c, "edge")    for c in roi_dims["edge_pits"]] +
@@ -763,7 +887,7 @@ def detect_pits(image_input, scale_um_per_px, specimen_mask, roi_dims,
     # Recompute the hull boundary zone (same logic as Stage 2) and reclassify
     # any edge candidate whose area or centroid is predominantly interior.
     # Reclassified candidates are tagged so the debug vis can show them in orange.
-    boundary_zone = _compute_boundary_zone(specimen_mask)
+    boundary_zone = _compute_boundary_zone(specimen_mask, edge_buffer_px=edge_buffer_px)
     reclassified_tagged = []
     for candidate, pit_type in tagged_candidates:
         if pit_type == "edge":
@@ -795,7 +919,8 @@ def detect_pits(image_input, scale_um_per_px, specimen_mask, roi_dims,
         result = _process_candidate(
             candidate, pit_type, scale_um_per_px, gray,
             mean_surface_intensity, effective_min_area_um2,
-            dominant_orientation=dominant_orientation
+            dominant_orientation=dominant_orientation,
+            thresholds=thresholds,
         )
         if result["rejection_reasons"]:
             rejected_r1_r5.append(result)
@@ -895,4 +1020,16 @@ def detect_pits(image_input, scale_um_per_px, specimen_mask, roi_dims,
         scale_um_per_px, roi_dims
     )
 
-    return confirmed_pits, rejected_candidates, debug_vis
+    # --- 6. Rejection summary for downstream flag evaluation -----------------
+    _rule_counts = {f"R{i}": 0 for i in range(1, 9)}
+    for _r in rejected_candidates:
+        for _reason in _r.get("rejection_reasons", []):
+            _key = _reason.split(":")[0].strip()
+            if _key in _rule_counts:
+                _rule_counts[_key] += 1
+    rejection_summary = {
+        "total_rejected": len(rejected_candidates),
+        "per_rule": _rule_counts,
+    }
+
+    return confirmed_pits, rejected_candidates, debug_vis, rejection_summary

@@ -33,7 +33,7 @@ def main():
     try:
         scale_um_per_px, _, _ = detect_scale_bar(SAMPLE_IMAGE)
         roi_mask, _ = extract_roi(SAMPLE_IMAGE)
-        pit_contours, _ = detect_pits(SAMPLE_IMAGE, roi_mask)
+        pit_contours, _, _, _ = detect_pits(SAMPLE_IMAGE, roi_mask)
         metrics, _ = calculate_density(pit_contours, roi_mask, scale_um_per_px)
         classification, _ = classify_specimen(metrics)
 

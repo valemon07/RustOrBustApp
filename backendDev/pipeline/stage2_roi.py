@@ -43,9 +43,12 @@ from pipeline.config import (
     ROI_MIN_DIM_FRACTION,
     ROI_INCOMPLETE_LOW_FILL,
     CONTRAST_SWEEP_ENABLED, CONTRAST_SWEEP_GAMMAS,
+    EDGE_OVERLAP_THRESHOLD,
 )
 from pipeline.pipeline_flags import (
-    PipelineFlag, MASK_ROI_INCOMPLETE, SEVERITY_ERROR,
+    PipelineFlag,
+    MASK_ROI_INCOMPLETE, MASK_COVERAGE_LOW, MASK_COVERAGE_HIGH,
+    SEVERITY_ERROR, SEVERITY_WARNING,
 )
 
 
@@ -71,6 +74,13 @@ MIN_DARK_REGION_AREA_PX = 10
 # dark region "touches" it.  Catches pits that are adjacent to the boundary
 # without being literally on the 1-px-thick edge line.
 HULL_BOUNDARY_DILATION_PX = 5
+
+# Secondary centroid test threshold (µm²).
+# For candidates with area ≥ this value, also check whether the centroid
+# falls inside the boundary zone.  If the centroid is interior the candidate
+# is reclassified as surface_pit regardless of overlap fraction.
+# Matches LARGE_PIT_AREA_UM2 in stage3_pit_detection.py.
+LARGE_PIT_AREA_UM2_EDGE_CLASSIFY = 2000.0
 
 
 # ---------------------------------------------------------------------------
@@ -108,6 +118,8 @@ def extract_roi_contrast_sweep(
     image_input,
     scale_um_per_px: float = 1.0,
     gamma_values: list[float] | None = None,
+    edge_buffer_px: int | None = None,
+    morph_open_kernel_px: int | None = None,
 ):
     """Run extract_roi with each gamma; return the result with the largest mask area.
 
@@ -129,7 +141,9 @@ def extract_roi_contrast_sweep(
         return rd.get("width_px", 0) * rd.get("height_px", 0) * rd.get("mask_fill_ratio", 0.0)
 
     def _run(gamma: float):
-        return extract_roi(apply_gamma(base_image, gamma), scale_um_per_px)
+        return extract_roi(apply_gamma(base_image, gamma), scale_um_per_px,
+                           edge_buffer_px=edge_buffer_px,
+                           morph_open_kernel_px=morph_open_kernel_px)
 
     best_result  = None
     best_hull    = -1.0
@@ -205,31 +219,69 @@ def _fill_convex_hull(contour, img_h, img_w):
     return hull_mask, hull_points
 
 
-def _classify_dark_regions(hull_mask, otsu_mask):
+def _classify_dark_regions(hull_mask, otsu_mask,
+                            scale_um_per_px: float = 1.0,
+                            edge_buffer_px: int | None = None,
+                            morph_open_kernel_px: int | None = None):
     """
     Find every dark connected component inside hull_mask and classify it.
 
     Classification rule
     -------------------
-    A dark region is an **edge_pit** if any of its pixels falls within
-    HULL_BOUNDARY_DILATION_PX of the hull's boundary edge.
-    Otherwise it is a **surface_pit** (fully interior to the hull).
+    A dark region is an **edge_pit** when the fraction of its pixels that
+    overlap the hull boundary buffer zone is ≥ EDGE_OVERLAP_THRESHOLD
+    (0.60), i.e. the majority of the candidate lies within the boundary buffer.
+    Otherwise it is a **surface_pit** (predominantly interior to the hull).
+
+    For large candidates (area ≥ LARGE_PIT_AREA_UM2_EDGE_CLASSIFY µm²), a
+    secondary centroid test also reclassifies the candidate as surface_pit if
+    the centroid falls outside the boundary zone, regardless of overlap fraction.
+    This catches finger-like pits that originate at the edge but extend deep
+    into the interior.
 
     Parameters
     ----------
-    hull_mask  : uint8 binary mask, 255 = inside hull
-    otsu_mask  : uint8 binary mask, 255 = bright (Otsu output)
+    hull_mask           : uint8 binary mask, 255 = inside hull
+    otsu_mask           : uint8 binary mask, 255 = bright (Otsu output)
+    scale_um_per_px     : float, µm per pixel — used for the large-pit area test
+    edge_buffer_px      : int or None — boundary dilation radius in pixels.
+                          None falls back to HULL_BOUNDARY_DILATION_PX (5 px).
+                          Pass the value computed from config.EDGE_BUFFER_UM or a
+                          per-image override for scale-invariant control.
+    morph_open_kernel_px: int or None — if > 0, apply morphological opening to the
+                          dark region mask before connected-component extraction.
+                          The structuring element is an ellipse of diameter
+                          (2*morph_open_kernel_px + 1).  Opening removes dark
+                          features whose inscribed-circle radius is smaller than
+                          morph_open_kernel_px — primarily thin scratch artifacts —
+                          while preserving rounder pit-like blobs.  None / 0
+                          disables the operation (default, preserves existing
+                          behaviour).  Exposed as a per-image user override via
+                          image_overrides.json → frontend.
 
     Returns
     -------
     edge_pits, surface_pits : lists of dicts
-        Each dict: {mask (uint8 full-image), area_px (int), bbox (x,y,w,h)}
+        Each dict: {mask, area_px, bbox, edge_overlap_fraction}
     """
     # Dark pixels that are inside the hull.
     inside_hull_dark = cv2.bitwise_and(
         cv2.bitwise_not(otsu_mask),
         hull_mask
     )
+
+    # Optional morphological opening: removes thin scratch artifacts whose
+    # inscribed-circle radius is smaller than morph_open_kernel_px pixels.
+    # Applied BEFORE connected-component extraction so no fragmented scratch
+    # blobs are passed to Stage 3.  Disabled by default (None / 0).
+    if morph_open_kernel_px and morph_open_kernel_px > 0:
+        k = morph_open_kernel_px * 2 + 1
+        open_kernel = cv2.getStructuringElement(
+            cv2.MORPH_ELLIPSE, (k, k)
+        )
+        inside_hull_dark = cv2.morphologyEx(
+            inside_hull_dark, cv2.MORPH_OPEN, open_kernel
+        )
 
     # Hull boundary: the outermost ring of hull pixels.
     eroded_hull = cv2.erode(
@@ -240,7 +292,8 @@ def _classify_dark_regions(hull_mask, otsu_mask):
     hull_boundary = hull_mask - eroded_hull
 
     # Dilate the boundary to create a proximity zone.
-    dil_size = HULL_BOUNDARY_DILATION_PX * 2 + 1
+    _buf     = edge_buffer_px if edge_buffer_px is not None else HULL_BOUNDARY_DILATION_PX
+    dil_size = _buf * 2 + 1
     boundary_zone = cv2.dilate(
         hull_boundary,
         np.ones((dil_size, dil_size), np.uint8),
@@ -262,19 +315,40 @@ def _classify_dark_regions(hull_mask, otsu_mask):
 
         region_mask = (labels == label_id).astype(np.uint8) * 255
 
+        # Area-overlap fraction test: classify as edge only when the majority
+        # of the candidate's pixels fall inside the boundary buffer zone.
+        overlap_px        = int(np.count_nonzero(cv2.bitwise_and(region_mask, boundary_zone)))
+        edge_overlap_frac = overlap_px / area   # area > 0 guaranteed by MIN_DARK_REGION_AREA_PX
+        is_edge           = edge_overlap_frac >= EDGE_OVERLAP_THRESHOLD
+
+        # Secondary centroid test for large pits: if the centroid falls outside
+        # the boundary zone the pit is predominantly interior regardless of the
+        # overlap fraction.
+        if is_edge:
+            area_um2 = area * (scale_um_per_px ** 2)
+            if area_um2 >= LARGE_PIT_AREA_UM2_EDGE_CLASSIFY:
+                moments = cv2.moments(region_mask.astype(np.float32))
+                if moments["m00"] > 0:
+                    cx = int(moments["m10"] / moments["m00"])
+                    cy = int(moments["m01"] / moments["m00"])
+                    if (0 <= cy < boundary_zone.shape[0]
+                            and 0 <= cx < boundary_zone.shape[1]
+                            and boundary_zone[cy, cx] == 0):
+                        is_edge = False   # centroid is interior → surface
+
         entry = {
-            "mask":    region_mask,
-            "area_px": area,
-            "bbox":    (
+            "mask":                  region_mask,
+            "area_px":               area,
+            "bbox":                  (
                 int(stats[label_id, cv2.CC_STAT_LEFT]),
                 int(stats[label_id, cv2.CC_STAT_TOP]),
                 int(stats[label_id, cv2.CC_STAT_WIDTH]),
                 int(stats[label_id, cv2.CC_STAT_HEIGHT]),
             ),
+            "edge_overlap_fraction": round(edge_overlap_frac, 4),
         }
 
-        # Does any pixel of this region fall inside the boundary zone?
-        if np.any(cv2.bitwise_and(region_mask, boundary_zone)):
+        if is_edge:
             edge_pits.append(entry)
         else:
             surface_pits.append(entry)
@@ -395,7 +469,8 @@ def _check_roi_completeness(
 # Public API
 # ---------------------------------------------------------------------------
 
-def extract_roi(image_input, scale_um_per_px=1.0):
+def extract_roi(image_input, scale_um_per_px=1.0, edge_buffer_px=None,
+                morph_open_kernel_px=None):
     """
     Extract the specimen ROI from a darkfield microscopy image.
 
@@ -480,7 +555,11 @@ def extract_roi(image_input, scale_um_per_px=1.0):
     otsu_no_sb = otsu_mask.copy()
     otsu_no_sb[sb_y0:, sb_x0:] = 255   # treat scale bar region as "bright"
 
-    edge_pits, surface_pits = _classify_dark_regions(hull_mask, otsu_no_sb)
+    edge_pits, surface_pits = _classify_dark_regions(
+        hull_mask, otsu_no_sb, scale_um_per_px,
+        edge_buffer_px=edge_buffer_px,
+        morph_open_kernel_px=morph_open_kernel_px,
+    )
 
     # --- 6. Bounding box and crop ------------------------------------------
     nonzero_ys, nonzero_xs = np.where(hull_mask > 0)
@@ -510,8 +589,23 @@ def extract_roi(image_input, scale_um_per_px=1.0):
     else:
         mask_warning = None
 
+    # Coverage flags as structured PipelineFlag objects
+    coverage_flags = []
+    if mask_fill_ratio < MASK_FILL_LOW_THRESHOLD:
+        coverage_flags.append(PipelineFlag(
+            name=MASK_COVERAGE_LOW,
+            severity=SEVERITY_ERROR,
+            detail=f"mask_fill_ratio={mask_fill_ratio:.4f} < threshold {MASK_FILL_LOW_THRESHOLD}",
+        ))
+    elif mask_fill_ratio > MASK_FILL_HIGH_THRESHOLD:
+        coverage_flags.append(PipelineFlag(
+            name=MASK_COVERAGE_HIGH,
+            severity=SEVERITY_WARNING,
+            detail=f"mask_fill_ratio={mask_fill_ratio:.4f} > threshold {MASK_FILL_HIGH_THRESHOLD}",
+        ))
+
     # --- 6c. ROI completeness checks ----------------------------------------
-    pipeline_flags = _check_roi_completeness(
+    pipeline_flags = coverage_flags + _check_roi_completeness(
         image, hull_mask,
         x_min, x_max, y_min, y_max,
         img_h, img_w,

@@ -125,7 +125,7 @@ def _run_one(filename):
 
     scale, _, _ = detect_scale_bar(path, um_value_override=um_override)
     specimen_mask, _, roi_dims, _ = extract_roi(path, scale)
-    confirmed, rejected, _ = detect_pits(
+    confirmed, rejected, _, _ = detect_pits(
         path, scale, specimen_mask, roi_dims
     )
     gray = _cv2.cvtColor(_cv2.imread(path), _cv2.COLOR_BGR2GRAY)

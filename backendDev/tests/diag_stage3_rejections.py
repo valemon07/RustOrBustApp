@@ -60,7 +60,7 @@ def main():
     print(f"           ROI {roi_dims['width_um']:.0f} × {roi_dims['height_um']:.0f} µm")
 
     # Stage 3 — verbose rejection log
-    confirmed, rejected, _ = detect_pits(
+    confirmed, rejected, _, _ = detect_pits(
         path, scale_um_per_px, specimen_mask, roi_dims, verbose=True
     )
 
