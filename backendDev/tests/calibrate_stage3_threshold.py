@@ -96,7 +96,7 @@ def _pipeline_to_stage3(image_path, expected_um, min_area_override_um2):
     stage3_module.SCALE_AWARE_AREA_COEFF = float(min_area_override_um2) * scale_um_per_px
 
     try:
-        confirmed_pits, _, _ = detect_pits(
+        confirmed_pits, _, _, _ = detect_pits(
             image_path, scale_um_per_px, specimen_mask, roi_dims
         )
     finally:

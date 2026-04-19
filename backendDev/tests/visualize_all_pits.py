@@ -152,7 +152,7 @@ def _process_one(image_path):
             return f"  skip  {filename} (no scale bar detected)"
 
         specimen_mask, _, roi_dims, _ = extract_roi(image_path, scale_um_per_px)
-        confirmed_pits, rejected_candidates, _ = detect_pits(
+        confirmed_pits, rejected_candidates, _, _ = detect_pits(
             image_path, scale_um_per_px, specimen_mask, roi_dims
         )
 

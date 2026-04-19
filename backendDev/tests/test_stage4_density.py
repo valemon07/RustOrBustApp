@@ -30,7 +30,7 @@ def main():
     try:
         scale_um_per_px, _, _       = detect_scale_bar(SAMPLE_IMAGE)
         specimen_mask, _, roi_dims, _ = extract_roi(SAMPLE_IMAGE, scale_um_per_px)
-        confirmed_pits, _, _         = detect_pits(
+        confirmed_pits, _, _, _      = detect_pits(
             SAMPLE_IMAGE, scale_um_per_px, specimen_mask, roi_dims
         )
         density_metrics, zone_grid, hotspot_zone, debug_vis = calculate_density(

@@ -123,7 +123,7 @@ def _run_one(primary_rel, fallback_rel, expected_um, debug_filename, label):
 
     # --- Stage 3 -----------------------------------------------------------
     try:
-        confirmed_pits, _, _ = detect_pits(
+        confirmed_pits, _, _, _ = detect_pits(
             image_path, scale_um_per_px, specimen_mask, roi_dims
         )
     except Exception as exc:
