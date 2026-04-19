@@ -1,67 +1,46 @@
 import React, { createContext, useState } from 'react';
 
-// Default settings 
+// Default settings — match the module-level constants in stage2_roi.py / stage3_pit_detection.py.
+// Special sentinels:
+//   gamma = 0             → auto contrast sweep (no fixed gamma)
+//   morph_open_kernel_px = 0 → morphological open disabled
 const DEFAULT_SETTINGS = {
-  largePixelAreaThreshold: 2000.0,
-  scaleBreakpointHigh: 4.0,
-  edgeReclassificationThreshold: 0.5,
-  surfacePitDarknessThreshold: 0.3,
-  exposureGamma: 1,
-  customThresholds: [], // Array of floats sent to backend
+  gamma: 1,
+  morph_open_kernel_px: 0,
+  r7_max_intensity_ratio: 0.85,
+  r3_max_aspect_ratio: 8.0,
+  r4_min_circularity: 0.08,
+  r8_min_aspect_ratio: 3.0,
 };
+
+const ALL_SETTING_KEYS = Object.keys(DEFAULT_SETTINGS);
 
 export const SettingsContext = createContext();
 
 export function SettingsProvider({ children }) {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
-  const [useDefaults, setUseDefaults] = useState(true);
-  const [usingDefaultPerSetting, setUsingDefaultPerSetting] = useState({
-    largePixelAreaThreshold: true,
-    scaleBreakpointHigh: true,
-    edgeReclassificationThreshold: true,
-    surfacePitDarknessThreshold: true,
-  });
+  const [usingDefaultPerSetting, setUsingDefaultPerSetting] = useState(
+    Object.fromEntries(ALL_SETTING_KEYS.map(k => [k, true]))
+  );
 
   const updateSetting = (key, value) => {
-    const parsedValue = typeof value === 'string' ? parseFloat(value) || 0 : value;
-    setSettings(prev => ({
-      ...prev,
-      [key]: parsedValue
-    }));
-    
-    // Auto-toggle: if value matches default, mark as using default; otherwise mark as custom
-    const isDefault = parsedValue === DEFAULT_SETTINGS[key];
+    const parsed = typeof value === 'string' ? parseFloat(value) : value;
+    const safe   = isNaN(parsed) ? 0 : parsed;
+    setSettings(prev => ({ ...prev, [key]: safe }));
     setUsingDefaultPerSetting(prev => ({
       ...prev,
-      [key]: isDefault
+      [key]: safe === DEFAULT_SETTINGS[key],
     }));
   };
 
   const toggleSettingDefault = (key) => {
-    // Clicking the default button always restores to default
-    setSettings(prev => ({
-      ...prev,
-      [key]: DEFAULT_SETTINGS[key]
-    }));
-    setUsingDefaultPerSetting(prev => ({
-      ...prev,
-      [key]: true
-    }));
+    setSettings(prev => ({ ...prev, [key]: DEFAULT_SETTINGS[key] }));
+    setUsingDefaultPerSetting(prev => ({ ...prev, [key]: true }));
   };
 
   const resetToDefaults = () => {
     setSettings(DEFAULT_SETTINGS);
-    setUseDefaults(true);
-    setUsingDefaultPerSetting({
-      largePixelAreaThreshold: true,
-      scaleBreakpointHigh: true,
-      edgeReclassificationThreshold: true,
-      surfacePitDarknessThreshold: true,
-    });
-  };
-
-  const exportSettings = () => {
-    return useDefaults ? null : settings; // null signals: use backend defaults
+    setUsingDefaultPerSetting(Object.fromEntries(ALL_SETTING_KEYS.map(k => [k, true])));
   };
 
   return (
@@ -69,12 +48,9 @@ export function SettingsProvider({ children }) {
       settings,
       updateSetting,
       resetToDefaults,
-      exportSettings,
-      useDefaults,
-      setUseDefaults,
       usingDefaultPerSetting,
       toggleSettingDefault,
-      DEFAULT_SETTINGS
+      DEFAULT_SETTINGS,
     }}>
       {children}
     </SettingsContext.Provider>
