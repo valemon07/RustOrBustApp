@@ -64,30 +64,47 @@ if sys.platform == 'win32':
         sys.exit(1)
     
     TESSERACT_DIR = valid_dirs[0][1]
+    # Normalize to backslashes for proper Windows path handling
+    TESSERACT_DIR = os.path.normpath(TESSERACT_DIR)
     print(f"[backend.spec] Selected: {TESSERACT_DIR} (score={valid_dirs[0][0]})")
+    print(f"[backend.spec] Normalized path: {TESSERACT_DIR}")
     
     # Collect tesseract.exe + all DLLs it needs
     if TESSERACT_DIR and os.path.isdir(TESSERACT_DIR):
-        tesseract_binaries.append(
-            (os.path.join(TESSERACT_DIR, 'tesseract.exe'), 'tesseract')
-        )
+        exe_src = os.path.join(TESSERACT_DIR, 'tesseract.exe')
+        tesseract_binaries.append((exe_src, 'tesseract'))
+        print(f"[backend.spec] Added binary: {exe_src} -> tesseract")
+        
+        dll_count = 0
         for dll in glob.glob(os.path.join(TESSERACT_DIR, '*.dll')):
             tesseract_binaries.append((dll, 'tesseract'))
+            dll_count += 1
+        print(f"[backend.spec] Added {dll_count} DLLs")
         
         # Collect tessdata (language files)
         tessdata_dir = os.path.join(TESSERACT_DIR, 'tessdata')
+        print(f"[backend.spec] Collecting tessdata from: {tessdata_dir}")
+        data_count = 0
         for f in ['eng.traineddata', 'osd.traineddata']:
             src = os.path.join(tessdata_dir, f)
             if os.path.isfile(src):
                 tesseract_datas.append((src, 'tesseract/tessdata'))
+                print(f"[backend.spec]   Added: {src} -> tesseract/tessdata")
+                data_count += 1
+            else:
+                print(f"[backend.spec]   NOT FOUND: {src}")
+        print(f"[backend.spec] Total tessdata files added: {data_count}")
         
         # Also include tessdata configs directory if it exists
         tessdata_configs = os.path.join(tessdata_dir, 'configs')
         if os.path.isdir(tessdata_configs):
+            config_count = 0
             for f in os.listdir(tessdata_configs):
                 src = os.path.join(tessdata_configs, f)
                 if os.path.isfile(src):
                     tesseract_datas.append((src, 'tesseract/tessdata/configs'))
+                    config_count += 1
+            print(f"[backend.spec] Added {config_count} config files")
     else:
         print("[backend.spec] ERROR: No valid Tesseract install directory")
         sys.exit(1)
@@ -95,6 +112,18 @@ elif sys.platform == 'darwin':
     print("NOTE: macOS build expects Tesseract installed via: brew install tesseract")
 elif sys.platform == 'linux':
     print("NOTE: Linux build expects Tesseract installed via: apt-get install tesseract-ocr")
+
+print(f"[backend.spec] Summary: {len(tesseract_binaries)} binaries, {len(tesseract_datas)} datas to bundle")
+if tesseract_binaries:
+    for src, dest in tesseract_binaries[:3]:
+        print(f"[backend.spec]   bin: {src} -> {dest}")
+if len(tesseract_binaries) > 3:
+    print(f"[backend.spec]   ... and {len(tesseract_binaries) - 3} more")
+if tesseract_datas:
+    for src, dest in tesseract_datas[:3]:
+        print(f"[backend.spec]   data: {src} -> {dest}")
+if len(tesseract_datas) > 3:
+    print(f"[backend.spec]   ... and {len(tesseract_datas) - 3} more")
 
 # ---------------------------------------------------------------------------
 # Analysis
