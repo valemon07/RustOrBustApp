@@ -33,13 +33,26 @@ if sys.platform == 'win32':
         os.path.join(os.environ.get('ProgramFiles', r'C:\Program Files'), 'Tesseract-OCR'),
         os.path.join(os.environ.get('ProgramFiles(x86)', r'C:\Program Files (x86)'), 'Tesseract-OCR'),
     ]
-    TESSERACT_DIR = next(
-        (
-            d for d in candidate_dirs
-            if d and os.path.isfile(os.path.join(d, 'tesseract.exe'))
-        ),
-        None,
-    )
+    valid_dirs = []
+    for d in candidate_dirs:
+        if not d:
+            continue
+        exe = os.path.join(d, 'tesseract.exe')
+        tessdata = os.path.join(d, 'tessdata')
+        eng = os.path.join(tessdata, 'eng.traineddata')
+        osd = os.path.join(tessdata, 'osd.traineddata')
+        if os.path.isfile(exe):
+            score = 0
+            if os.path.isdir(tessdata):
+                score += 1
+            if os.path.isfile(eng):
+                score += 1
+            if os.path.isfile(osd):
+                score += 1
+            valid_dirs.append((score, d))
+
+    valid_dirs.sort(key=lambda item: item[0], reverse=True)
+    TESSERACT_DIR = valid_dirs[0][1] if valid_dirs and valid_dirs[0][0] > 0 else None
     
     # Collect tesseract.exe + all DLLs it needs
     if TESSERACT_DIR and os.path.isdir(TESSERACT_DIR):

@@ -23,11 +23,11 @@ function getBackendPath() {
   if (isDev) {
     // Development: use merged backend folder with venv
     const appRoot = app.getAppPath();
-    const venvPython = path.join(appRoot, 'backend', '.venv', 'Scripts', 'python.exe');
+    const venvPython = path.join(appRoot, 'backEnd', '.venv', 'Scripts', 'python.exe');
     const pythonCmd = fs.existsSync(venvPython) ? venvPython : 'python';
     return {
       command: pythonCmd,
-      args: [path.join(appRoot, 'backend', 'server.py')],
+      args: [path.join(appRoot, 'backEnd', 'server.py')],
     };
   }
 

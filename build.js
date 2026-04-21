@@ -16,7 +16,7 @@ const path = require('path');
 const fs = require('fs');
 
 const ROOT = __dirname;
-const BACKEND_DIR = path.join(ROOT, 'backend');
+const BACKEND_DIR = path.join(ROOT, 'backEnd');
 const DIST_DIR = path.join(BACKEND_DIR, 'dist', 'rustorbust-backend');
 
 const args = process.argv.slice(2);
