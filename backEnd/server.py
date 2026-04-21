@@ -90,6 +90,7 @@ def analyze():
             if row_data["flagged_for_review"] == "Yes":
                 _flagged_images.append({
                     "filename": filename,
+                    "filepath": image_path,
                     "reasons": [
                         {"rule": r.strip(), "detail": r.strip()}
                         for r in row_data["reason_for_flag"].split(";")

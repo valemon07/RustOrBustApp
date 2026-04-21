@@ -7,7 +7,10 @@ export default function FlaggedImagesModal({ flaggedImages, onClose }) {
   const [imageDataUrl, setImageDataUrl] = useState(null);
   const [loadingImage, setLoadingImage] = useState(false);
 
-  if (!flaggedImages || flaggedImages.length === 0) {
+  // Render nothing if no flagged images
+  const hasFlaggedImages = flaggedImages && flaggedImages.length > 0;
+  
+  if (!hasFlaggedImages) {
     return null;
   }
 
@@ -39,8 +42,15 @@ export default function FlaggedImagesModal({ flaggedImages, onClose }) {
     setImageDataUrl(null);
   };
 
+  const handleOverlayClick = (e) => {
+    // Only close if clicking directly on the overlay, not on the modal
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={handleOverlayClick}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>⚠️ Flagged Images Detected</h2>
