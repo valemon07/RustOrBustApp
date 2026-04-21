@@ -1,4 +1,5 @@
 import React, { useContext, useState } from "react";
+import ReactDOM from "react-dom";
 import FlaggedImagesModal from "../Components/FlaggedImagesModal";
 import { SettingsContext } from "../contexts/SettingsContext";
 
@@ -64,7 +65,7 @@ export default function FileUpload({ className, isDragging = false }) {
             setFlaggedImages(
               data.flaggedImages.map((item) => ({
                 filename: item.filename,
-                filepath: item.filename,
+                filepath: item.filepath || item.filename,
                 rejectionReasons: item.reasons || [
                   { rule: "Unknown", detail: item.reason || "Flagged during analysis" },
                 ],
@@ -120,11 +121,15 @@ export default function FileUpload({ className, isDragging = false }) {
 
   return (
     <>
-      {showModal && (
+      {showModal && ReactDOM.createPortal(
         <FlaggedImagesModal
           flaggedImages={flaggedImages}
-          onClose={() => setShowModal(false)}
-        />
+          onClose={() => {
+            setShowModal(false);
+            setFlaggedImages([]);
+          }}
+        />,
+        document.body
       )}
       <div
         className={`${className} ${isDragging ? "dragging" : ""} ${isProcessing ? "processing" : ""}`}

@@ -150,9 +150,12 @@ ipcMain.handle('dialog:openFile', async () => {
 
 ipcMain.handle('file:readImageAsDataUrl', async (event, filePath) => {
   try {
-    const data = fs.readFileSync(filePath);
+    // Ensure we have an absolute path
+    const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(filePath);
+    
+    const data = fs.readFileSync(absolutePath);
     const base64 = data.toString('base64');
-    const ext = path.extname(filePath).toLowerCase();
+    const ext = path.extname(absolutePath).toLowerCase();
     const mimeType = {
       '.jpg': 'image/jpeg',
       '.jpeg': 'image/jpeg',
