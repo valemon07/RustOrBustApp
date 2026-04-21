@@ -33,6 +33,11 @@ if sys.platform == 'win32':
         os.path.join(os.environ.get('ProgramFiles', r'C:\Program Files'), 'Tesseract-OCR'),
         os.path.join(os.environ.get('ProgramFiles(x86)', r'C:\Program Files (x86)'), 'Tesseract-OCR'),
     ]
+    
+    print("[backend.spec] Searching for Tesseract...")
+    print(f"[backend.spec] TESSERACT_DIR env var: {env_tess}")
+    print(f"[backend.spec] shutil.which('tesseract'): {path_tess}")
+    
     valid_dirs = []
     for d in candidate_dirs:
         if not d:
@@ -41,18 +46,25 @@ if sys.platform == 'win32':
         tessdata = os.path.join(d, 'tessdata')
         eng = os.path.join(tessdata, 'eng.traineddata')
         osd = os.path.join(tessdata, 'osd.traineddata')
-        if os.path.isfile(exe):
-            score = 0
-            if os.path.isdir(tessdata):
-                score += 1
-            if os.path.isfile(eng):
-                score += 1
-            if os.path.isfile(osd):
-                score += 1
+        exe_exists = os.path.isfile(exe)
+        tessdata_exists = os.path.isdir(tessdata)
+        eng_exists = os.path.isfile(eng)
+        osd_exists = os.path.isfile(osd)
+        print(f"[backend.spec] Candidate: {d}")
+        print(f"  exe: {exe_exists}, tessdata: {tessdata_exists}, eng.traineddata: {eng_exists}, osd.traineddata: {osd_exists}")
+        if exe_exists:
+            score = (tessdata_exists, eng_exists, osd_exists)
             valid_dirs.append((score, d))
+            print(f"  → Added with score {score}")
 
     valid_dirs.sort(key=lambda item: item[0], reverse=True)
-    TESSERACT_DIR = valid_dirs[0][1] if valid_dirs and valid_dirs[0][0] > 0 else None
+    if not valid_dirs:
+        print("[backend.spec] ERROR: No valid Tesseract installation found!")
+        print(f"[backend.spec] Candidates checked: {[d for d in candidate_dirs if d]}")
+        sys.exit(1)
+    
+    TESSERACT_DIR = valid_dirs[0][1]
+    print(f"[backend.spec] Selected: {TESSERACT_DIR} (score={valid_dirs[0][0]})")
     
     # Collect tesseract.exe + all DLLs it needs
     if TESSERACT_DIR and os.path.isdir(TESSERACT_DIR):
@@ -77,8 +89,8 @@ if sys.platform == 'win32':
                 if os.path.isfile(src):
                     tesseract_datas.append((src, 'tesseract/tessdata/configs'))
     else:
-        print(f"WARNING: Tesseract not found. Checked candidates: {candidate_dirs}")
-        print("Install from: https://github.com/UB-Mannheim/tesseract/wiki")
+        print("[backend.spec] ERROR: No valid Tesseract install directory")
+        sys.exit(1)
 elif sys.platform == 'darwin':
     print("NOTE: macOS build expects Tesseract installed via: brew install tesseract")
 elif sys.platform == 'linux':
