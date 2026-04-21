@@ -95,8 +95,6 @@ out/
 backend/build/
 backend/dist/
 
-package_lock.json
-
 backend/outputs/
 backend/__pycache__
 backend/pipeline/__pycache__
