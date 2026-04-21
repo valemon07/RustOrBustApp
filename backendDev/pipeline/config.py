@@ -102,6 +102,21 @@ EDGE_OVERLAP_THRESHOLD: float = 0.60
 EDGE_BUFFER_UM: float | None = None
 
 # ---------------------------------------------------------------------------
+# Pipeline operating scale range
+# ---------------------------------------------------------------------------
+# Images whose detected scale factor falls outside this range cannot be
+# processed reliably.  Stage 1 is still run so the actual scale is recorded,
+# then the pipeline short-circuits and returns a SCALE_OUT_OF_RANGE error row.
+#
+# Known image types in the dataset and their approximate scales:
+#   Overview images   : ~4.20 µm/px  (1000 µm scale bar)
+#   High-mag images   : ~1.05 µm/px  (150 µm scale bar)
+#   CR3-3 cross-section: 0.08–0.26 µm/px — outside the supported range
+#
+PIPELINE_SCALE_MIN_UM_PX: float = 0.5    # µm/px — below this the image is too high-mag
+PIPELINE_SCALE_MAX_UM_PX: float = 10.0   # µm/px — above this the image is too low-mag
+
+# ---------------------------------------------------------------------------
 # Excluded specimens
 # ---------------------------------------------------------------------------
 # Specimen IDs whose images should be skipped entirely by the standard

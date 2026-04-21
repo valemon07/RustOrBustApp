@@ -96,6 +96,16 @@ RULE_DOMINATED_REJECTION = "RULE_DOMINATED_REJECTION"
 """A single rule responsible for > 70% of all rejections AND rejection count > 20.
 Useful for threshold diagnostics; does not indicate the result is unusable."""
 
+# Stage 1 — scale calibration
+SCALE_OUT_OF_RANGE = "SCALE_OUT_OF_RANGE"
+"""
+The detected scale factor is outside the pipeline's supported operating range
+(0.5–10.0 µm/px).  Results cannot be computed.
+
+Action required: retake this image at a different magnification so the scale
+falls within the supported range.
+"""
+
 # Dataset-level flags (computed after all images run)
 DENSITY_OUTLIER_HIGH = "DENSITY_OUTLIER_HIGH"
 """macro_density_per_cm > mean + 3σ of successful images — statistical outlier, verify manually."""
@@ -107,6 +117,7 @@ DENSITY_OUTLIER_LOW = "DENSITY_OUTLIER_LOW"
 # Canonical severity for each flag name
 # ---------------------------------------------------------------------------
 FLAG_SEVERITY: dict = {
+    SCALE_OUT_OF_RANGE:           SEVERITY_ERROR,
     MASK_ROI_INCOMPLETE:          SEVERITY_ERROR,
     MASK_COVERAGE_LOW:            SEVERITY_ERROR,
     MASK_COVERAGE_HIGH:           SEVERITY_WARNING,
