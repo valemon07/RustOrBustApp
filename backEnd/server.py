@@ -30,7 +30,7 @@ from run_pipeline import process_image                           # noqa: E402
 from pipeline.stage6_csv_export import CSV_COLUMNS              # noqa: E402
 
 app = Flask(__name__)
-CORS(app, origins=["http://localhost:5173", "http://localhost:3000"])
+CORS(app, origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "http://localhost:3000"])
 
 # Populated during /analyze; read by /flagged-images
 _flagged_images: list = []
