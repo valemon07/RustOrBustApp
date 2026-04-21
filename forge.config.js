@@ -9,7 +9,7 @@ module.exports = {
     // be spawned as a child process.  Electron Forge copies extraResource
     // entries into  <app>/resources/  at package time.
     extraResource: [
-      path.resolve(__dirname, 'backEnd', 'dist', 'rustorbust-backend'),
+      path.resolve(__dirname, 'backend', 'dist', 'rustorbust-backend'),
     ],
   },
   rebuildConfig: {},
@@ -17,6 +17,13 @@ module.exports = {
     {
       name: '@electron-forge/maker-squirrel',
       config: {},
+    },
+    {
+      name: '@electron-forge/maker-dmg',
+      config: {
+        format: 'ULFO',
+      },
+      platforms: ['darwin'],
     },
     {
       name: '@electron-forge/maker-zip',
