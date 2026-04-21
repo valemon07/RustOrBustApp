@@ -23,7 +23,7 @@ function getBackendPath() {
   if (isDev) {
     // Development: use merged backend folder with venv
     const appRoot = app.getAppPath();
-    const venvPython = path.join(appRoot, 'backend', 'venv', 'Scripts', 'python.exe');
+    const venvPython = path.join(appRoot, 'backend', '.venv', 'Scripts', 'python.exe');
     const pythonCmd = fs.existsSync(venvPython) ? venvPython : 'python';
     return {
       command: pythonCmd,
@@ -36,9 +36,20 @@ function getBackendPath() {
     ? 'rustorbust-backend.exe'
     : 'rustorbust-backend';
 
-  // extraResource files land in resources/ next to the app.asar
-  const exePath = path.join(process.resourcesPath, 'rustorbust-backend', exeName);
-  return { command: exePath, args: [] };
+  // extraResource files land in resources/ next to the app.asar, but some
+  // packagers/setups may flatten or relocate this folder. Try common layouts.
+  const candidatePaths = [
+    path.join(process.resourcesPath, 'rustorbust-backend', exeName),
+    path.join(process.resourcesPath, exeName),
+    path.join(path.dirname(process.execPath), 'resources', 'rustorbust-backend', exeName),
+  ];
+
+  const foundExe = candidatePaths.find((p) => fs.existsSync(p));
+  if (!foundExe) {
+    console.error('[backend] Executable not found. Tried:', candidatePaths);
+  }
+
+  return { command: foundExe || candidatePaths[0], args: [] };
 }
 
 function startBackend() {
@@ -49,6 +60,7 @@ function startBackend() {
     stdio: ['ignore', 'pipe', 'pipe'],
     // Prevent the backend window from appearing on Windows
     windowsHide: true,
+    cwd: path.isAbsolute(command) ? path.dirname(command) : undefined,
   });
 
   backendProcess.stdout.on('data', (data) => {

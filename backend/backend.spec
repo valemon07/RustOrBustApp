@@ -15,6 +15,7 @@ import os
 import glob
 import platform
 import sys
+import shutil
 
 # ---------------------------------------------------------------------------
 # Tesseract bundling (Windows only - other platforms use system Tesseract)
@@ -23,10 +24,25 @@ tesseract_binaries = []
 tesseract_datas = []
 
 if sys.platform == 'win32':
-    TESSERACT_DIR = r'C:\Program Files\Tesseract-OCR'
+    # Resolve Tesseract install directory from env, PATH, or common defaults.
+    env_tess = os.environ.get('TESSERACT_DIR')
+    path_tess = shutil.which('tesseract')
+    candidate_dirs = [
+        env_tess,
+        os.path.dirname(path_tess) if path_tess else None,
+        os.path.join(os.environ.get('ProgramFiles', r'C:\Program Files'), 'Tesseract-OCR'),
+        os.path.join(os.environ.get('ProgramFiles(x86)', r'C:\Program Files (x86)'), 'Tesseract-OCR'),
+    ]
+    TESSERACT_DIR = next(
+        (
+            d for d in candidate_dirs
+            if d and os.path.isfile(os.path.join(d, 'tesseract.exe'))
+        ),
+        None,
+    )
     
     # Collect tesseract.exe + all DLLs it needs
-    if os.path.isdir(TESSERACT_DIR):
+    if TESSERACT_DIR and os.path.isdir(TESSERACT_DIR):
         tesseract_binaries.append(
             (os.path.join(TESSERACT_DIR, 'tesseract.exe'), 'tesseract')
         )
@@ -48,7 +64,7 @@ if sys.platform == 'win32':
                 if os.path.isfile(src):
                     tesseract_datas.append((src, 'tesseract/tessdata/configs'))
     else:
-        print(f"WARNING: Tesseract not found at {TESSERACT_DIR}")
+        print(f"WARNING: Tesseract not found. Checked candidates: {candidate_dirs}")
         print("Install from: https://github.com/UB-Mannheim/tesseract/wiki")
 elif sys.platform == 'darwin':
     print("NOTE: macOS build expects Tesseract installed via: brew install tesseract")

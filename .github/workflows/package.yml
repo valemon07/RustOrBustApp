@@ -40,6 +40,14 @@ jobs:
           cache: 'pip'
           cache-dependency-path: 'backend/requirements.txt'
 
+      - name: Install Tesseract (Windows)
+        if: matrix.os == 'windows-latest'
+        run: choco install tesseract --no-progress -y
+
+      - name: Install Tesseract (macOS)
+        if: matrix.os == 'macos-latest'
+        run: brew install tesseract
+
       - name: Install Python dependencies
         run: |
           cd backend
@@ -47,6 +55,23 @@ jobs:
 
       - name: Build backend
         run: npm run build:backend
+
+      - name: Verify bundled Tesseract (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $root = 'backend/dist/rustorbust-backend/tesseract'
+          $required = @(
+            "$root/tesseract.exe",
+            "$root/tessdata/eng.traineddata",
+            "$root/tessdata/osd.traineddata"
+          )
+          $missing = $required | Where-Object { -not (Test-Path $_) }
+          if ($missing.Count -gt 0) {
+            Write-Error "Missing bundled Tesseract files:`n$($missing -join "`n")"
+            exit 1
+          }
+          Write-Host 'Tesseract bundle verified.'
 
       - name: Install Node dependencies
         run: npm ci

@@ -2,6 +2,7 @@ import React, { useContext, useState } from "react";
 import ReactDOM from "react-dom";
 import FlaggedImagesModal from "../Components/FlaggedImagesModal";
 import { SettingsContext } from "../contexts/SettingsContext";
+import folderIcon from "../assets/folder-open-solid-full.svg";
 
 const ANALYZE_URL = "http://localhost:5001/analyze";
 const FLAGGED_URL = "http://localhost:5001/flagged-images";
@@ -138,7 +139,7 @@ export default function FileUpload({ className, isDragging = false }) {
         onDrop={isProcessing ? undefined : onDrop}
       >
         <img
-          src="/src/assets/folder-open-solid-full.svg"
+          src={folderIcon}
           alt="Folder Icon"
           className="upload-icon"
         />
