@@ -12,9 +12,9 @@ import cv2
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from pipeline.stage1_scale_bar     import detect_scale_bar
-from pipeline.stage2_roi           import extract_roi
-from pipeline.stage3_pit_detection import detect_pits
+from backend.pipeline.stage1_scale_bar     import detect_scale_bar
+from backend.pipeline.stage2_roi           import extract_roi
+from backend.pipeline.stage3_pit_detection import detect_pits
 
 SAMPLE_IMAGE = os.path.join(os.path.dirname(__file__), "..", "data", "raw",
                              "CR3-7 c-side BF002.jpg")

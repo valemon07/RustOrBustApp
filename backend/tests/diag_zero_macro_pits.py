@@ -18,9 +18,9 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from pipeline.stage1_scale_bar     import detect_scale_bar
-from pipeline.stage2_roi           import extract_roi
-from pipeline.stage3_pit_detection import (
+from backend.pipeline.stage1_scale_bar     import detect_scale_bar
+from backend.pipeline.stage2_roi           import extract_roi
+from backend.pipeline.stage3_pit_detection import (
     detect_pits,
     MACRO_PIT_AREA_UM2, MIN_PIT_AREA_UM2,
     MAX_PIT_AREA_UM2_SURFACE, MAX_PIT_AREA_UM2_EDGE,
@@ -28,7 +28,7 @@ from pipeline.stage3_pit_detection import (
     R6_MIN_COUNT,
     _apply_clahe, _compute_surface_intensity, _process_candidate,
 )
-from pipeline.config import MANUAL_SCALE_OVERRIDES
+from backend.pipeline.config import MANUAL_SCALE_OVERRIDES
 
 RAW_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "raw")
 

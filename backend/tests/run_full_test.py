@@ -31,10 +31,10 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from pipeline.stage1_scale_bar     import detect_scale_bar, ScaleBarNotFoundError
-from pipeline.stage2_roi           import (extract_roi, extract_roi_contrast_sweep,
+from backend.pipeline.stage1_scale_bar     import detect_scale_bar, ScaleBarNotFoundError
+from backend.pipeline.stage2_roi           import (extract_roi, extract_roi_contrast_sweep,
                                            apply_gamma, HULL_BOUNDARY_DILATION_PX)
-from pipeline.stage3_pit_detection import (
+from backend.pipeline.stage3_pit_detection import (
     detect_pits,
     MIN_PIT_AREA_UM2, MAX_PIT_AREA_UM2_SURFACE, MAX_PIT_AREA_UM2_EDGE,
     MAX_ASPECT_RATIO, MAX_ASPECT_RATIO_LARGE_PIT,
@@ -43,14 +43,14 @@ from pipeline.stage3_pit_detection import (
     MIN_PIXEL_COUNT, LARGE_PIT_AREA_UM2, MACRO_PIT_AREA_UM2,
     R6_MIN_COUNT,
 )
-from pipeline.stage4_density       import calculate_density
-from pipeline.config               import (MANUAL_SCALE_OVERRIDES,
+from backend.pipeline.stage4_density       import calculate_density
+from backend.pipeline.config               import (MANUAL_SCALE_OVERRIDES,
                                            NO_SCALE_BAR_IMAGES,
                                            EXCLUDED_SPECIMENS,
                                            CONTRAST_SWEEP_ENABLED,
                                            CONTRAST_SWEEP_GAMMAS,
                                            EDGE_BUFFER_UM)
-from pipeline.pipeline_flags       import (
+from backend.pipeline.pipeline_flags       import (
     PipelineFlag,
     ZERO_MACRO_PITS, ROI_TOO_SMALL, CONTRAST_CORRECTION_STRONG,
     HIGH_EDGE_PIT_RATIO, HIGH_REJECTION_RATE, RULE_DOMINATED_REJECTION,

@@ -29,10 +29,10 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from pipeline.stage1_scale_bar     import detect_scale_bar, ScaleBarNotFoundError
-from pipeline.stage2_roi           import extract_roi
-from pipeline.stage3_pit_detection import detect_pits
-from pipeline.config               import (MANUAL_SCALE_OVERRIDES,
+from backend.pipeline.stage1_scale_bar     import detect_scale_bar, ScaleBarNotFoundError
+from backend.pipeline.stage2_roi           import extract_roi
+from backend.pipeline.stage3_pit_detection import detect_pits
+from backend.pipeline.config               import (MANUAL_SCALE_OVERRIDES,
                                            NO_SCALE_BAR_IMAGES,
                                            EXCLUDED_SPECIMENS)
 

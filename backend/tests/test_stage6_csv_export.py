@@ -12,12 +12,12 @@ import cv2
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from pipeline.stage1_scale_bar import detect_scale_bar
-from pipeline.stage2_roi import extract_roi
-from pipeline.stage3_pit_detection import detect_pits
-from pipeline.stage4_density import calculate_density
-from pipeline.stage5_classification import classify_specimen
-from pipeline.stage6_csv_export import export_row
+from backend.pipeline.stage1_scale_bar import detect_scale_bar
+from backend.pipeline.stage2_roi import extract_roi
+from backend.pipeline.stage3_pit_detection import detect_pits
+from backend.pipeline.stage4_density import calculate_density
+from backend.pipeline.stage5_classification import classify_specimen
+from backend.pipeline.stage6_csv_export import export_row
 
 SAMPLE_IMAGE = os.path.join(os.path.dirname(__file__), "..", "data", "raw",
                             "CR3-7 c-side BF002.jpg")

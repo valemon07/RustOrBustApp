@@ -15,7 +15,7 @@ import cv2
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from pipeline.stage1_scale_bar import detect_scale_bar
+from backend.pipeline.stage1_scale_bar import detect_scale_bar
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 

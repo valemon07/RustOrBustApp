@@ -30,6 +30,62 @@ sys.path.insert(0, _BACKEND_DEV)
 from run_pipeline import process_image                           # noqa: E402
 from pipeline.stage6_csv_export import CSV_COLUMNS              # noqa: E402
 
+# ---------------------------------------------------------------------------
+# Detect PyInstaller bundle and set up paths
+# ---------------------------------------------------------------------------
+def _is_bundled():
+    """Return True when running inside a PyInstaller bundle."""
+    return getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS')
+
+def _setup_tesseract():
+    """Point pytesseract at the bundled tesseract binary if we are frozen."""
+    try:
+        import pytesseract
+    except ImportError:
+        return
+
+    if _is_bundled():
+        # PyInstaller extracts bundled files into sys._MEIPASS
+        tess_path = os.path.join(sys._MEIPASS, 'tesseract', 'tesseract.exe')
+        if os.path.isfile(tess_path):
+            pytesseract.pytesseract.tesseract_cmd = tess_path
+            # tessdata lives next to the binary
+            os.environ['TESSDATA_PREFIX'] = os.path.join(
+                sys._MEIPASS, 'tesseract', 'tessdata'
+            )
+    else:
+        # Development: check common install paths by platform
+        import platform
+        system = platform.system()
+        
+        if system == 'Windows':
+            prog_files = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+            if os.path.isfile(prog_files):
+                pytesseract.pytesseract.tesseract_cmd = prog_files
+        elif system == 'Darwin':  # macOS
+            macos_paths = [
+                '/usr/local/bin/tesseract',
+                '/opt/homebrew/bin/tesseract',
+            ]
+            for path in macos_paths:
+                if os.path.isfile(path):
+                    pytesseract.pytesseract.tesseract_cmd = path
+                    break
+        elif system == 'Linux':
+            linux_paths = [
+                '/usr/bin/tesseract',
+                '/usr/local/bin/tesseract',
+            ]
+            for path in linux_paths:
+                if os.path.isfile(path):
+                    pytesseract.pytesseract.tesseract_cmd = path
+                    break
+
+_setup_tesseract()
+
+# ---------------------------------------------------------------------------
+# Flask app
+# ---------------------------------------------------------------------------
 app = Flask(__name__)
 CORS(app, origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "http://localhost:3000"])
 
