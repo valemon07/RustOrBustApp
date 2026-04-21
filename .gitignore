@@ -91,6 +91,7 @@ typings/
 # Electron-Forge
 out/
 
-# PyInstaller
-backEnd/build/
-backEnd/dist/
+package_lock.json
+
+backendDev/outputs/
+backendDev/__pycache__
