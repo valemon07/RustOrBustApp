@@ -81,30 +81,23 @@ if sys.platform == 'win32':
             dll_count += 1
         print(f"[backend.spec] Added {dll_count} DLLs")
         
-        # Collect tessdata (language files)
+        # Collect tessdata (language files) — use tree collection instead of individual files
+        # This ensures the entire tessdata directory with subdirs is copied correctly
         tessdata_dir = os.path.join(TESSERACT_DIR, 'tessdata')
-        print(f"[backend.spec] Collecting tessdata from: {tessdata_dir}")
-        data_count = 0
-        for f in ['eng.traineddata', 'osd.traineddata']:
-            src = os.path.join(tessdata_dir, f)
-            if os.path.isfile(src):
-                tesseract_datas.append((src, 'tesseract/tessdata'))
-                print(f"[backend.spec]   Added: {src} -> tesseract/tessdata")
-                data_count += 1
-            else:
-                print(f"[backend.spec]   NOT FOUND: {src}")
-        print(f"[backend.spec] Total tessdata files added: {data_count}")
+        if os.path.isdir(tessdata_dir):
+            # Collect the entire tessdata tree as a single entry
+            # (source_dir, dest_name) — PyInstaller will recursively copy source_dir to dest_name
+            tesseract_datas.append((tessdata_dir, 'tesseract/tessdata'))
+            print(f"[backend.spec] Added tessdata tree: {tessdata_dir} -> tesseract/tessdata")
+        else:
+            print(f"[backend.spec] ERROR: tessdata directory not found at {tessdata_dir}")
+            sys.exit(1)
         
         # Also include tessdata configs directory if it exists
         tessdata_configs = os.path.join(tessdata_dir, 'configs')
         if os.path.isdir(tessdata_configs):
-            config_count = 0
-            for f in os.listdir(tessdata_configs):
-                src = os.path.join(tessdata_configs, f)
-                if os.path.isfile(src):
-                    tesseract_datas.append((src, 'tesseract/tessdata/configs'))
-                    config_count += 1
-            print(f"[backend.spec] Added {config_count} config files")
+            tesseract_datas.append((tessdata_configs, 'tesseract/tessdata/configs'))
+            print(f"[backend.spec] Added tessdata configs tree: {tessdata_configs} -> tesseract/tessdata/configs")
     else:
         print("[backend.spec] ERROR: No valid Tesseract install directory")
         sys.exit(1)
