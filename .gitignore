@@ -90,3 +90,8 @@ typings/
 
 # Electron-Forge
 out/
+
+package_lock.json
+
+backendDev/outputs/
+backendDev/__pycache__
