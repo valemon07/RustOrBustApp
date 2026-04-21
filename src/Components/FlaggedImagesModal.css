@@ -9,16 +9,8 @@
   justify-content: center;
   align-items: center;
   z-index: 1000;
-  animation: fadeIn 0.2s ease-in;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  backdrop-filter: blur(0px);
+  will-change: auto;
 }
 
 .modal-content {
@@ -31,18 +23,6 @@
   max-height: 80vh;
   display: flex;
   flex-direction: column;
-  animation: slideUp 0.3s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-@keyframes slideUp {
-  from {
-    transform: translateY(12px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
 }
 
 .modal-header {
@@ -109,13 +89,12 @@
   border-radius: 16px;
   padding: 14px;
   background: var(--picker-bg);
-  transition: background-color 0.2s, box-shadow 0.2s, transform 0.2s;
+  transition: background-color 0.2s, box-shadow 0.2s;
 }
 
 .flagged-item:hover {
   background: var(--picker-surface);
   box-shadow: var(--picker-shadow);
-  transform: translateY(-1px);
 }
 
 .flagged-header {
@@ -212,16 +191,15 @@
   cursor: pointer;
   font-weight: 500;
   font-size: 0.9em;
-  transition: opacity 0.2s, transform 0.2s;
+  transition: opacity 0.2s;
 }
 
 .close-modal-button:hover {
   opacity: 0.9;
-  transform: translateY(-1px);
 }
 
 .close-modal-button:active {
-  transform: translateY(0);
+  opacity: 0.8;
 }
 
 /* Image Viewer */
@@ -236,7 +214,6 @@
   justify-content: center;
   align-items: center;
   z-index: 1001;
-  animation: fadeIn 0.2s ease-in;
 }
 
 .image-viewer {

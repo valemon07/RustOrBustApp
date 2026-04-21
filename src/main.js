@@ -21,13 +21,13 @@ function getBackendPath() {
   const isDev = !!MAIN_WINDOW_VITE_DEV_SERVER_URL;
 
   if (isDev) {
-    // Development: prefer the venv python which has all dependencies installed
+    // Development: use merged backend folder with venv
     const appRoot = app.getAppPath();
-    const venvPython = path.join(appRoot, 'backendDev', 'venv', 'Scripts', 'python.exe');
+    const venvPython = path.join(appRoot, 'backend', 'venv', 'Scripts', 'python.exe');
     const pythonCmd = fs.existsSync(venvPython) ? venvPython : 'python';
     return {
       command: pythonCmd,
-      args: [path.join(appRoot, 'backEnd', 'server.py')],
+      args: [path.join(appRoot, 'backend', 'server.py')],
     };
   }
 
@@ -127,7 +127,7 @@ const createWindow = () => {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
     },
   });
 
@@ -166,6 +166,7 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
+  stopBackend();
   if (process.platform !== 'darwin') {
     app.quit();
   }
@@ -175,33 +176,27 @@ app.on('will-quit', () => {
   stopBackend();
 });
 
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and import them here.
+// ── IPC handlers ──────────────────────────────────────────────────────────────
 
 ipcMain.handle('dialog:openFile', async () => {
-  // result is an array of filepaths
   const result = await dialog.showOpenDialog({
     filters: [
-        { name: 'Images', extensions: ['jpg', 'png', 'gif'] },
-        { name: 'Movies', extensions: ['mkv', 'avi', 'mp4'] },
-        { name: 'Custom File Type', extensions: ['as'] },
-        { name: 'All Files', extensions: ['*'] }
+      { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'tif', 'tiff'] },
+      { name: 'All Files', extensions: ['*'] },
     ],
-    properties: [
-      "openFile",
-      "multiSelections"
-    ]
+    properties: ['openFile', 'multiSelections'],
   });
   return result; // { canceled, filePaths }
 });
 
 ipcMain.handle('file:readImageAsDataUrl', async (event, filePath) => {
   try {
-    const data = fs.readFileSync(filePath);
-    const base64 = data.toString('base64');
+    // Ensure we have an absolute path
+    const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(filePath);
     
-    // Determine image type from extension
-    const ext = path.extname(filePath).toLowerCase();
+    const data = fs.readFileSync(absolutePath);
+    const base64 = data.toString('base64');
+    const ext = path.extname(absolutePath).toLowerCase();
     const mimeType = {
       '.jpg': 'image/jpeg',
       '.jpeg': 'image/jpeg',
@@ -209,7 +204,6 @@ ipcMain.handle('file:readImageAsDataUrl', async (event, filePath) => {
       '.gif': 'image/gif',
       '.webp': 'image/webp',
     }[ext] || 'image/jpeg';
-    
     return `data:${mimeType};base64,${base64}`;
   } catch (err) {
     console.error('Error reading image:', err);

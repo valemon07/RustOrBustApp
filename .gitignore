@@ -94,3 +94,9 @@ out/
 # PyInstaller
 backEnd/build/
 backEnd/dist/
+
+package_lock.json
+
+backendDev/outputs/
+backendDev/__pycache__
+backendDev/pipeline/__pycache__
