@@ -35,7 +35,32 @@ from pipeline.stage6_csv_export import CSV_COLUMNS              # noqa: E402
 # ---------------------------------------------------------------------------
 def _is_bundled():
     """Return True when running inside a PyInstaller bundle."""
-    return getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS')
+    return bool(getattr(sys, 'frozen', False))
+
+
+def _candidate_tesseract_roots():
+    """Return candidate directories that may contain bundled tesseract.exe."""
+    roots = []
+    meipass = getattr(sys, '_MEIPASS', None)
+    exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'executable', None) else None
+
+    if meipass:
+        roots.extend([
+            os.path.join(meipass, 'tesseract'),
+            os.path.join(meipass, '_internal', 'tesseract'),
+        ])
+
+    if exe_dir:
+        roots.extend([
+            os.path.join(exe_dir, 'tesseract'),
+            os.path.join(exe_dir, '_internal', 'tesseract'),
+        ])
+
+    unique = []
+    for item in roots:
+        if item and item not in unique:
+            unique.append(item)
+    return unique
 
 def _setup_tesseract():
     """Point pytesseract at the bundled tesseract binary if we are frozen."""
@@ -45,14 +70,21 @@ def _setup_tesseract():
         return
 
     if _is_bundled():
-        # PyInstaller extracts bundled files into sys._MEIPASS
-        tess_path = os.path.join(sys._MEIPASS, 'tesseract', 'tesseract.exe')
-        if os.path.isfile(tess_path):
+        for tess_root in _candidate_tesseract_roots():
+            tess_path = os.path.join(tess_root, 'tesseract.exe')
+            tessdata_dir = os.path.join(tess_root, 'tessdata')
+            if not os.path.isfile(tess_path):
+                continue
+
             pytesseract.pytesseract.tesseract_cmd = tess_path
-            # tessdata lives next to the binary
-            os.environ['TESSDATA_PREFIX'] = os.path.join(
-                sys._MEIPASS, 'tesseract', 'tessdata'
-            )
+
+            # Ensure runtime DLL loading can find Leptonica/Tesseract DLLs.
+            os.environ['PATH'] = tess_root + os.pathsep + os.environ.get('PATH', '')
+
+            # Set both common variants for robust tessdata lookup.
+            if os.path.isdir(tessdata_dir):
+                os.environ['TESSDATA_PREFIX'] = tessdata_dir
+            return
     else:
         # Development: check common install paths by platform
         import platform

@@ -4,6 +4,7 @@ import FileUpload from "../lib/FileUpload";
 import { useContext } from "react";
 import { SettingsContext } from "../contexts/SettingsContext";
 import SettingsPanel from "./SettingsPanel";
+import gearIcon from "../assets/gear-solid-full.svg";
 
 export default function CenterPanel({ showSettings, setShowSettings }) {
   const containerRef = React.useRef(null);
@@ -85,7 +86,7 @@ export default function CenterPanel({ showSettings, setShowSettings }) {
             aria-label="Open pipeline settings"
           >
             <img
-              src="src/assets/gear-solid-full.svg"
+              src={gearIcon}
               alt="Settings Icon"
               className="settings-icon"
             />

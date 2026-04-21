@@ -10,29 +10,57 @@ if (started) {
   app.quit();
 }
 
-// ── Flask server lifecycle ────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Backend process management
+// ---------------------------------------------------------------------------
+let backendProcess = null;
+const BACKEND_PORT = 5001;
+const BACKEND_URL = `http://127.0.0.1:${BACKEND_PORT}`;
 
-let flaskProcess = null;
+function getBackendPath() {
+  const isDev = !!MAIN_WINDOW_VITE_DEV_SERVER_URL;
 
-function startFlaskServer() {
-  const appRoot = app.getAppPath();
-  const serverScript = path.join(appRoot, 'backEnd', 'server.py');
+  if (isDev) {
+    // Development: use merged backend folder with venv
+    const appRoot = app.getAppPath();
+    const venvPython = path.join(appRoot, 'backend', '.venv', 'Scripts', 'python.exe');
+    const pythonCmd = fs.existsSync(venvPython) ? venvPython : 'python';
+    return {
+      command: pythonCmd,
+      args: [path.join(appRoot, 'backend', 'server.py')],
+    };
+  }
 
-  // Use the project venv that has cv2, numpy, flask, etc.
-  // Falls back to system python3 if neither venv path exists.
-  const venvCandidates = [
-    // rust_or_bust/venv has all required packages (cv2, flask, numpy, etc.)
-    path.join(require('os').homedir(), 'rust_or_bust', 'venv', 'bin', 'python'),
-    path.join(appRoot, 'backendDev', 'venv', 'bin', 'python'),
+  // Production: use the PyInstaller-built exe bundled as extraResource
+  const exeName = process.platform === 'win32'
+    ? 'rustorbust-backend.exe'
+    : 'rustorbust-backend';
+
+  // extraResource files land in resources/ next to the app.asar, but some
+  // packagers/setups may flatten or relocate this folder. Try common layouts.
+  const candidatePaths = [
+    path.join(process.resourcesPath, 'rustorbust-backend', exeName),
+    path.join(process.resourcesPath, exeName),
+    path.join(path.dirname(process.execPath), 'resources', 'rustorbust-backend', exeName),
   ];
-  const systemPython = process.platform === 'win32' ? 'python' : 'python3';
-  const pythonCmd = venvCandidates.find((p) => fs.existsSync(p)) ?? systemPython;
 
-  console.log(`[Flask] Starting: ${pythonCmd} ${serverScript}`);
+  const foundExe = candidatePaths.find((p) => fs.existsSync(p));
+  if (!foundExe) {
+    console.error('[backend] Executable not found. Tried:', candidatePaths);
+  }
 
-  flaskProcess = spawn(pythonCmd, [serverScript], {
-    cwd: appRoot,
+  return { command: foundExe || candidatePaths[0], args: [] };
+}
+
+function startBackend() {
+  const { command, args } = getBackendPath();
+  console.log(`[backend] Starting: ${command} ${args.join(' ')}`);
+
+  backendProcess = spawn(command, args, {
     stdio: ['ignore', 'pipe', 'pipe'],
+    // Prevent the backend window from appearing on Windows
+    windowsHide: true,
+    cwd: path.isAbsolute(command) ? path.dirname(command) : undefined,
   });
 
   flaskProcess.stdout.on('data', (d) => console.log(`[Flask] ${d.toString().trimEnd()}`));
