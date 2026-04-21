@@ -90,3 +90,7 @@ typings/
 
 # Electron-Forge
 out/
+
+# PyInstaller
+backEnd/build/
+backEnd/dist/

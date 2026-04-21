@@ -1,9 +1,16 @@
+const path = require('path');
 const { FusesPlugin } = require('@electron-forge/plugin-fuses');
 const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 
 module.exports = {
   packagerConfig: {
     asar: true,
+    // The PyInstaller-built backend lives outside the asar archive so it can
+    // be spawned as a child process.  Electron Forge copies extraResource
+    // entries into  <app>/resources/  at package time.
+    extraResource: [
+      path.resolve(__dirname, 'backEnd', 'dist', 'rustorbust-backend'),
+    ],
   },
   rebuildConfig: {},
   makers: [
@@ -28,11 +35,8 @@ module.exports = {
     {
       name: '@electron-forge/plugin-vite',
       config: {
-        // `build` can specify multiple entry builds, which can be Main process, Preload scripts, Worker process, etc.
-        // If you are familiar with Vite configuration, it will look really familiar.
         build: [
           {
-            // `entry` is just an alias for `build.lib.entry` in the corresponding file of `config`.
             entry: 'src/main.js',
             config: 'vite.main.config.mjs',
             target: 'main',
