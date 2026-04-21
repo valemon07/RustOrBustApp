@@ -55,7 +55,7 @@ if sys.platform == 'win32':
         if exe_exists:
             score = (tessdata_exists, eng_exists, osd_exists)
             valid_dirs.append((score, d))
-            print(f"  → Added with score {score}")
+            print(f"  => Added with score {score}")
 
     valid_dirs.sort(key=lambda item: item[0], reverse=True)
     if not valid_dirs:
