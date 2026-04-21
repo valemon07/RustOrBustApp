@@ -13,7 +13,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from pipeline.stage2_roi import extract_roi
+from backend.pipeline.stage2_roi import extract_roi
 
 SAMPLE_IMAGE = os.path.join(os.path.dirname(__file__), "..", "data", "raw",
                             "CR3-7 c-side BF002.jpg")

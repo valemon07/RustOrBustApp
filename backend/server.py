@@ -53,10 +53,32 @@ def _setup_tesseract():
                 sys._MEIPASS, 'tesseract', 'tessdata'
             )
     else:
-        # Development: check common Windows install path
-        prog_files = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-        if os.path.isfile(prog_files):
-            pytesseract.pytesseract.tesseract_cmd = prog_files
+        # Development: check common install paths by platform
+        import platform
+        system = platform.system()
+        
+        if system == 'Windows':
+            prog_files = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+            if os.path.isfile(prog_files):
+                pytesseract.pytesseract.tesseract_cmd = prog_files
+        elif system == 'Darwin':  # macOS
+            macos_paths = [
+                '/usr/local/bin/tesseract',
+                '/opt/homebrew/bin/tesseract',
+            ]
+            for path in macos_paths:
+                if os.path.isfile(path):
+                    pytesseract.pytesseract.tesseract_cmd = path
+                    break
+        elif system == 'Linux':
+            linux_paths = [
+                '/usr/bin/tesseract',
+                '/usr/local/bin/tesseract',
+            ]
+            for path in linux_paths:
+                if os.path.isfile(path):
+                    pytesseract.pytesseract.tesseract_cmd = path
+                    break
 
 _setup_tesseract()
 

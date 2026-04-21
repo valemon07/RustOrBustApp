@@ -17,10 +17,10 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from pipeline.stage1_scale_bar     import detect_scale_bar
-from pipeline.stage2_roi           import extract_roi
-import pipeline.stage3_pit_detection as stage3_module
-from pipeline.stage3_pit_detection import detect_pits
+from backend.pipeline.stage1_scale_bar     import detect_scale_bar
+from backend.pipeline.stage2_roi           import extract_roi
+import backend.pipeline.stage3_pit_detection as stage3_module
+from backend.pipeline.stage3_pit_detection import detect_pits
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 

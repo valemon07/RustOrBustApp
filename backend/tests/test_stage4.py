@@ -22,10 +22,10 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from pipeline.stage1_scale_bar    import detect_scale_bar
-from pipeline.stage2_roi          import extract_roi
-from pipeline.stage3_pit_detection import detect_pits
-from pipeline.stage4_density      import calculate_density
+from backend.pipeline.stage1_scale_bar    import detect_scale_bar
+from backend.pipeline.stage2_roi          import extract_roi
+from backend.pipeline.stage3_pit_detection import detect_pits
+from backend.pipeline.stage4_density      import calculate_density
 
 ROOT      = os.path.join(os.path.dirname(__file__), "..")
 DEBUG_DIR = os.path.join(ROOT, "outputs", "debug")
