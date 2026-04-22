@@ -1,6 +1,7 @@
 import React, { useContext, useState } from 'react';
 import { SettingsContext } from '../contexts/SettingsContext';
 import './SettingsPanel.css';
+import arrowIcon from '../assets/arrow-left-solid-full.svg';
 
 export default function SettingsPanel({ onClose }) {
   const {
@@ -116,7 +117,7 @@ export default function SettingsPanel({ onClose }) {
             aria-label="Back to upload"
           >
             <img
-              src="src/assets/arrow-left-solid-full.svg"
+              src={arrowIcon}
               alt="Back Icon"
               className="back-icon"
             />
