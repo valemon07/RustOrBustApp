@@ -24,6 +24,7 @@ from PyInstaller.building.datastruct import Tree
 # ---------------------------------------------------------------------------
 tesseract_binaries = []
 tesseract_datas = []
+tesseract_tree = None  # Will hold the Tree object for tessdata
 
 if sys.platform == 'win32':
     # Resolve Tesseract install directory from env, PATH, or common defaults.
@@ -84,16 +85,15 @@ if sys.platform == 'win32':
         print(f"[backend.spec] Added {dll_count} DLLs")
         
         # Collect tessdata (language files) — use Tree for proper nested directory handling
-        # Tree ensures the directory structure is preserved in the bundle
+        # Tree objects cannot go in datas; they must be added directly to COLLECT below
         tessdata_dir = os.path.join(TESSERACT_DIR, 'tessdata')
         if os.path.isdir(tessdata_dir):
             # Tree(source, dest, prefix) creates a runtime bundle of the entire directory tree
-            tree_obj = Tree(tessdata_dir, prefix='tesseract/tessdata')
-            tesseract_datas.append(tree_obj)
+            tesseract_tree = Tree(tessdata_dir, prefix='tesseract/tessdata')
             # Count files in tessdata for logging
             file_count = sum([len(files) for _, _, files in os.walk(tessdata_dir)])
-            print(f"[backend.spec] Added tessdata tree: {tessdata_dir}")
-            print(f"[backend.spec]   Tree object created with {file_count} files/subdirs")
+            print(f"[backend.spec] Created tessdata tree: {tessdata_dir}")
+            print(f"[backend.spec]   Tree with {file_count} files/subdirs")
             print(f"[backend.spec]   Destination: tesseract/tessdata")
         else:
             print(f"[backend.spec] ERROR: tessdata directory not found at {tessdata_dir}")
@@ -108,21 +108,14 @@ elif sys.platform == 'darwin':
 elif sys.platform == 'linux':
     print("NOTE: Linux build expects Tesseract installed via: apt-get install tesseract-ocr")
 
-print(f"[backend.spec] Summary: {len(tesseract_binaries)} binaries, {len(tesseract_datas)} datas to bundle")
+print(f"[backend.spec] Summary: {len(tesseract_binaries)} binaries, {len(tesseract_datas)} datas, Tree={'yes' if tesseract_tree else 'no'}")
 if tesseract_binaries:
     for src, dest in tesseract_binaries[:3]:
         print(f"[backend.spec]   bin: {src} -> {dest}")
 if len(tesseract_binaries) > 3:
     print(f"[backend.spec]   ... and {len(tesseract_binaries) - 3} more")
-if tesseract_datas:
-    for item in tesseract_datas[:3]:
-        if isinstance(item, Tree):
-            print(f"[backend.spec]   data: Tree({item.root} -> {item.prefix})")
-        else:
-            src, dest = item
-            print(f"[backend.spec]   data: {src} -> {dest}")
-if len(tesseract_datas) > 3:
-    print(f"[backend.spec]   ... and {len(tesseract_datas) - 3} more")
+if tesseract_tree:
+    print(f"[backend.spec]   data: Tree({tesseract_tree.root} -> {tesseract_tree.prefix})")
 
 # ---------------------------------------------------------------------------
 # Analysis
@@ -171,6 +164,7 @@ coll = COLLECT(
     exe,
     a.binaries,
     a.datas,
+    *([tesseract_tree] if tesseract_tree else []),
     strip=False,
     upx=True,
     upx_exclude=[],
