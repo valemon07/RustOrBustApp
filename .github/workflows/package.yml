@@ -1,0 +1,189 @@
+name: Package App
+
+on:
+  push:
+    tags:
+      - 'v*'
+    branches:
+      - 'packaging'
+  workflow_dispatch:
+
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            node-version: '20.x'
+            name: 'Windows'
+          - os: macos-latest
+            node-version: '20.x'
+            name: 'macOS'
+
+    runs-on: ${{ matrix.os }}
+    name: Package for ${{ matrix.name }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Setup Python (for backend)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'backEnd/requirements.txt'
+
+      - name: Install Tesseract (Windows)
+        if: matrix.os == 'windows-latest'
+        run: choco install tesseract --no-progress -y
+
+      - name: Resolve Tesseract path (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $candidates = @(
+            'C:/Program Files/Tesseract-OCR',
+            'C:/Program Files (x86)/Tesseract-OCR'
+          )
+          $resolved = $candidates | Where-Object { Test-Path "$_/tesseract.exe" } | Select-Object -First 1
+          if (-not $resolved) {
+            Write-Error 'Could not resolve Tesseract install directory on Windows runner.'
+            exit 1
+          }
+          "TESSERACT_DIR=$resolved" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "Resolved TESSERACT_DIR=$resolved"
+          Write-Host "Files in $resolved/tessdata:"
+          Get-ChildItem "$resolved/tessdata" -ErrorAction SilentlyContinue | Select-Object -First 10 | ForEach-Object { Write-Host "  $_" }
+      - name: Install Tesseract (macOS)
+        if: matrix.os == 'macos-latest'
+        run: brew install tesseract
+
+      - name: Install Python dependencies
+        run: |
+          cd backEnd
+          pip install -r requirements.txt
+
+      - name: Debug Tesseract path (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          Write-Host "TESSERACT_DIR environment variable:"
+          Write-Host "  $env:TESSERACT_DIR"
+          if ($env:TESSERACT_DIR) {
+            $files = @('tesseract.exe', 'tessdata', 'tessdata/eng.traineddata', 'tessdata/osd.traineddata')
+            foreach ($f in $files) {
+              $path = Join-Path $env:TESSERACT_DIR $f
+              Write-Host "  [$([bool](Test-Path $path))] $path"
+            }
+          }
+
+      - name: Build backend
+        run: npm run build:backend
+
+      - name: Bundle Tesseract into backend dist (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          if (-not $env:TESSERACT_DIR) { throw "TESSERACT_DIR is not set" }
+
+          $src = $env:TESSERACT_DIR
+          $dest = "backEnd/dist/rustorbust-backend/tesseract"
+
+          New-Item -ItemType Directory -Force -Path "$dest/tessdata" | Out-Null
+
+          Copy-Item -Force "$src/tesseract.exe" "$dest/tesseract.exe"
+          Copy-Item -Force "$src/tessdata/eng.traineddata" "$dest/tessdata/eng.traineddata"
+          Copy-Item -Force "$src/tessdata/osd.traineddata" "$dest/tessdata/osd.traineddata"
+
+          Write-Host "Bundled Tesseract into $dest"
+
+      - name: List bundle contents (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          Write-Host "=== Directory structure of backEnd/dist/rustorbust-backend ==="
+          $root = 'backEnd/dist/rustorbust-backend'
+          if (Test-Path $root) {
+            Get-ChildItem -Path $root -Recurse -Depth 5 | ForEach-Object {
+              $indent = '  ' * ($_.FullName.Replace($root, '').Split([IO.Path]::DirectorySeparatorChar).Count - 1)
+              if ($_.PSIsContainer) {
+                Write-Host "$indent[DIR]  $($_.Name)"
+              } else {
+                Write-Host "$indent[FILE] $($_.Name) ($([math]::Round($_.Length/1KB, 0))KB)"
+              }
+            }
+            Write-Host ""
+            Write-Host "=== Checking for Tesseract files ==="
+            $files = @('tesseract.exe', 'tessdata', 'tessdata/eng.traineddata', 'tessdata/osd.traineddata')
+            foreach ($f in $files) {
+              $path = Join-Path $root "tesseract" $f
+              $exists = Test-Path $path
+              Write-Host "[$($exists)] $path"
+            }
+          } else {
+            Write-Host "ERROR: $root does not exist"
+          }
+
+      - name: Verify bundled Tesseract (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $root = 'backEnd/dist/rustorbust-backend/tesseract'
+          $required = @(
+            "$root/tesseract.exe",
+            "$root/tessdata/eng.traineddata",
+            "$root/tessdata/osd.traineddata"
+          )
+          $missing = $required | Where-Object { -not (Test-Path $_) }
+          if ($missing.Count -gt 0) {
+            Write-Error "Missing bundled Tesseract files:`n$($missing -join "`n")"
+            exit 1
+          }
+          Write-Host 'Tesseract bundle verified.'
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Build Electron app
+        run: npm run build:electron
+
+      - name: Make packages (Windows)
+        if: matrix.os == 'windows-latest'
+        run: npm run make
+
+      - name: Make packages (macOS)
+        if: matrix.os == 'macos-latest'
+        run: npm run make
+
+      - name: Upload Windows artifacts
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rustorbustapp-windows
+          path: out/make/**/*
+          if-no-files-found: warn
+
+      - name: Upload macOS artifacts
+        if: matrix.os == 'macos-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rustorbustapp-macos
+          path: out/make/**/*
+          if-no-files-found: warn
+
+      - name: Create Release (on tag push)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: out/make/**/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -90,3 +90,11 @@ typings/
 
 # Electron-Forge
 out/
+
+# PyInstaller
+backend/build/
+backend/dist/
+
+backend/outputs/
+backend/__pycache__
+backend/pipeline/__pycache__

@@ -1,7 +1,96 @@
-:root {
-    --primary-color: hsl(260 60% 50%);
-    --secondary-color: hsl(260 60% 70%);
-    --text-color: hsl(0 0% 20%);
-    --bg-color: hsl(0 0% 95%);
-    --border-color: hsl(0 0% 80%);
+:root,
+:root[data-theme="light"],
+:root.theme-light,
+body[data-theme="light"],
+body.theme-light {
+    color-scheme: light;
+
+    --picker-radius: 24px;
+    --picker-radius-sm: 18px;
+    --picker-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+    --app-bg-start: hsl(34 24% 98%);
+    --app-bg-end: hsl(28 18% 95%);
+    --app-grid-line: hsl(28 10% 78% / 0.28);
+
+    --hero-kicker: hsl(18 48% 42%);
+    --hero-title: hsl(220 18% 14%);
+    --hero-subtitle: hsl(28 9% 34%);
+
+    --picker-bg: hsl(34 24% 99%);
+    --picker-bg-soft: hsl(31 32% 96%);
+    --picker-surface: hsl(34 24% 99%);
+    --picker-text: hsl(220 18% 12%);
+    --picker-muted: hsl(28 7% 42%);
+    --picker-primary: hsl(18 68% 42%);
+    --picker-accent: hsl(28 76% 54%);
+    --picker-border: hsl(28 12% 84%);
+    --picker-focus: hsl(18 68% 42% / 0.16);
+    --picker-shadow: 0 1px 2px hsl(220 20% 12% / 0.10), 0 2px 6px hsl(220 20% 12% / 0.08);
+    --picker-shadow-strong: 0 6px 16px hsl(220 20% 12% / 0.14), 0 2px 4px hsl(220 20% 12% / 0.08);
+}
+
+:root[data-theme="dark"],
+:root.theme-dark,
+body[data-theme="dark"],
+body.theme-dark {
+    color-scheme: dark;
+
+    --picker-radius: 24px;
+    --picker-radius-sm: 18px;
+    --picker-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+    --app-bg-start: hsl(24 10% 13%);
+    --app-bg-end: hsl(24 10% 10%);
+    --app-grid-line: hsl(28 8% 82% / 0.06);
+
+    --hero-kicker: hsl(18 42% 62%);
+    --hero-title: hsl(28 12% 95%);
+    --hero-subtitle: hsl(28 6% 73%);
+
+    --picker-bg: hsl(24 10% 15%);
+    --picker-bg-soft: hsl(24 10% 13%);
+    --picker-surface: hsl(24 10% 14%);
+    --picker-text: hsl(220 10% 96%);
+    --picker-muted: hsl(28 5% 72%);
+    --picker-primary: hsl(18 68% 56%);
+    --picker-accent: hsl(26 78% 58%);
+    --picker-border: hsl(28 6% 24%);
+    --picker-focus: hsl(18 68% 56% / 0.16);
+    --picker-shadow: 0 1px 2px hsl(220 20% 0% / 0.38), 0 4px 10px hsl(220 20% 0% / 0.28);
+    --picker-shadow-strong: 0 8px 20px hsl(220 20% 0% / 0.38), 0 2px 4px hsl(220 20% 0% / 0.24);
+}
+
+:root[data-theme="auto"],
+:root.theme-auto,
+body[data-theme="auto"],
+body.theme-auto {
+    color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root[data-theme="auto"],
+    :root.theme-auto,
+    body[data-theme="auto"],
+    body.theme-auto {
+        --app-bg-start: hsl(24 10% 13%);
+        --app-bg-end: hsl(24 10% 10%);
+        --app-grid-line: hsl(28 8% 82% / 0.06);
+
+        --hero-kicker: hsl(18 42% 62%);
+        --hero-title: hsl(28 12% 95%);
+        --hero-subtitle: hsl(220 6% 72%);
+
+        --picker-bg: hsl(24 10% 15%);
+        --picker-bg-soft: hsl(24 10% 13%);
+        --picker-surface: hsl(24 10% 14%);
+        --picker-text: hsl(220 10% 96%);
+        --picker-muted: hsl(220 6% 72%);
+        --picker-primary: hsl(18 68% 56%);
+        --picker-accent: hsl(26 78% 58%);
+        --picker-border: hsl(220 6% 24%);
+        --picker-focus: hsl(18 68% 56% / 0.16);
+        --picker-shadow: 0 1px 2px hsl(220 20% 0% / 0.38), 0 4px 10px hsl(220 20% 0% / 0.28);
+        --picker-shadow-strong: 0 8px 20px hsl(220 20% 0% / 0.38), 0 2px 4px hsl(220 20% 0% / 0.24);
+    }
 }
