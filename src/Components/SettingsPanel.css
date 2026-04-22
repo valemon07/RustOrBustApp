@@ -63,6 +63,22 @@
   flex-shrink: 0;
 }
 
+:root[data-theme="dark"] .back-icon,
+:root.theme-dark .back-icon,
+body[data-theme="dark"] .back-icon,
+body.theme-dark .back-icon {
+  filter: invert(1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="auto"] .back-icon,
+  :root.theme-auto .back-icon,
+  body[data-theme="auto"] .back-icon,
+  body.theme-auto .back-icon {
+    filter: invert(1);
+  }
+}
+
 .settings-panel h2 {
   margin: 0;
   font-size: 1.4rem;

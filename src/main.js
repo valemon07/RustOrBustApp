@@ -131,6 +131,8 @@ function waitForBackend(timeoutMs = 30000) {
 // Window creation
 // ---------------------------------------------------------------------------
 const createWindow = () => {
+  const isDev = !!MAIN_WINDOW_VITE_DEV_SERVER_URL;
+  
   const mainWindow = new BrowserWindow({
     width: 800,
     height: 600,
@@ -142,6 +144,11 @@ const createWindow = () => {
       nodeIntegration: false,
     },
   });
+
+  // Hide menu bar in production, show in development
+  if (!isDev) {
+    mainWindow.removeMenu();
+  }
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
