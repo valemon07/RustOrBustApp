@@ -3,7 +3,7 @@ import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import fs from 'node:fs';
 import { spawn } from 'node:child_process';
-import http from 'node:http';
+import net from 'node:net';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -63,73 +63,59 @@ function startBackend() {
     cwd: path.isAbsolute(command) ? path.dirname(command) : undefined,
   });
 
-  backendProcess.stdout.on('data', (data) => {
-    console.log(`[backend] ${data.toString().trim()}`);
-  });
-
-  backendProcess.stderr.on('data', (data) => {
-    console.error(`[backend] ${data.toString().trim()}`);
-  });
-
-  backendProcess.on('error', (err) => {
-    console.error('[backend] Failed to start:', err.message);
-  });
-
-  backendProcess.on('exit', (code) => {
-    console.log(`[backend] Exited with code ${code}`);
-    backendProcess = null;
-  });
-}
-
-function stopBackend() {
-  if (!backendProcess) return;
-  console.log('[backend] Stopping...');
-
-  if (process.platform === 'win32') {
-    // On Windows, spawn taskkill to ensure the process tree is killed
-    spawn('taskkill', ['/pid', String(backendProcess.pid), '/f', '/t'], {
-      windowsHide: true,
-    });
-  } else {
-    backendProcess.kill('SIGTERM');
-  }
-  backendProcess = null;
+  flaskProcess.stdout.on('data', (d) => console.log(`[Flask] ${d.toString().trimEnd()}`));
+  flaskProcess.stderr.on('data', (d) => console.error(`[Flask] ${d.toString().trimEnd()}`));
+  flaskProcess.on('error', (err) => console.error('[Flask] Failed to start:', err.message));
+  flaskProcess.on('exit', (code) => console.log(`[Flask] Exited with code ${code}`));
 }
 
 /**
- * Poll the backend /health endpoint until it responds (or timeout).
- * Returns a promise that resolves when the backend is ready.
+ * Poll port 5001 until it accepts a connection (Flask is ready) or we give up.
+ * Resolves when ready; resolves (with a warning) if max attempts exceeded so
+ * the window still opens even if Flask is slow to start.
  */
-function waitForBackend(timeoutMs = 30000) {
-  const start = Date.now();
-  return new Promise((resolve, reject) => {
+function waitForFlask(maxAttempts = 40, delayMs = 250) {
+  return new Promise((resolve) => {
+    let attempts = 0;
+
     const check = () => {
-      const req = http.get(`${BACKEND_URL}/health`, (res) => {
-        if (res.statusCode === 200) {
+      const socket = new net.Socket();
+      socket.setTimeout(150);
+
+      socket.on('connect', () => {
+        socket.destroy();
+        console.log('[Flask] Server is ready.');
+        resolve();
+      });
+
+      const retry = () => {
+        socket.destroy();
+        if (++attempts >= maxAttempts) {
+          console.warn('[Flask] Did not respond in time — opening window anyway.');
           resolve();
         } else {
-          retry();
+          setTimeout(check, delayMs);
         }
-      });
-      req.on('error', retry);
-      req.setTimeout(1000, () => { req.destroy(); retry(); });
-    };
+      };
 
-    const retry = () => {
-      if (Date.now() - start > timeoutMs) {
-        reject(new Error('Backend did not start within timeout'));
-        return;
-      }
-      setTimeout(check, 500);
+      socket.on('error', retry);
+      socket.on('timeout', retry);
+      socket.connect(5001, '127.0.0.1');
     };
 
     check();
   });
 }
 
-// ---------------------------------------------------------------------------
-// Window creation
-// ---------------------------------------------------------------------------
+function stopFlaskServer() {
+  if (flaskProcess) {
+    flaskProcess.kill();
+    flaskProcess = null;
+  }
+}
+
+// ── Window ────────────────────────────────────────────────────────────────────
+
 const createWindow = () => {
   const isDev = !!MAIN_WINDOW_VITE_DEV_SERVER_URL;
   
@@ -156,25 +142,14 @@ const createWindow = () => {
     mainWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
   }
 
-  // Only open DevTools in development
-  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-    mainWindow.webContents.openDevTools();
-  }
+  mainWindow.webContents.openDevTools();
 };
 
-// ---------------------------------------------------------------------------
-// App lifecycle
-// ---------------------------------------------------------------------------
+// ── App lifecycle ─────────────────────────────────────────────────────────────
+
 app.whenReady().then(async () => {
-  startBackend();
-
-  try {
-    await waitForBackend();
-    console.log('[backend] Ready — opening window');
-  } catch (err) {
-    console.error('[backend]', err.message, '— opening window anyway');
-  }
-
+  startFlaskServer();
+  await waitForFlask();
   createWindow();
 
   app.on('activate', () => {
@@ -185,14 +160,14 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
-  stopBackend();
+  stopFlaskServer();
   if (process.platform !== 'darwin') {
     app.quit();
   }
 });
 
 app.on('will-quit', () => {
-  stopBackend();
+  stopFlaskServer();
 });
 
 // ── IPC handlers ──────────────────────────────────────────────────────────────

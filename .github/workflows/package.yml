@@ -10,6 +10,8 @@ on:
 
 jobs:
   package:
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -17,9 +19,6 @@ jobs:
           - os: windows-latest
             node-version: '20.x'
             name: 'Windows'
-          - os: macos-latest
-            node-version: '20.x'
-            name: 'macOS'
 
     runs-on: ${{ matrix.os }}
     name: Package for ${{ matrix.name }}
@@ -61,28 +60,11 @@ jobs:
           Write-Host "Resolved TESSERACT_DIR=$resolved"
           Write-Host "Files in $resolved/tessdata:"
           Get-ChildItem "$resolved/tessdata" -ErrorAction SilentlyContinue | Select-Object -First 10 | ForEach-Object { Write-Host "  $_" }
-      - name: Install Tesseract (macOS)
-        if: matrix.os == 'macos-latest'
-        run: brew install tesseract
 
       - name: Install Python dependencies
         run: |
           cd backEnd
           pip install -r requirements.txt
-
-      - name: Debug Tesseract path (Windows)
-        if: matrix.os == 'windows-latest'
-        shell: pwsh
-        run: |
-          Write-Host "TESSERACT_DIR environment variable:"
-          Write-Host "  $env:TESSERACT_DIR"
-          if ($env:TESSERACT_DIR) {
-            $files = @('tesseract.exe', 'tessdata', 'tessdata/eng.traineddata', 'tessdata/osd.traineddata')
-            foreach ($f in $files) {
-              $path = Join-Path $env:TESSERACT_DIR $f
-              Write-Host "  [$([bool](Test-Path $path))] $path"
-            }
-          }
 
       - name: Build backend
         run: npm run build:backend
@@ -103,33 +85,6 @@ jobs:
           Copy-Item -Force "$src/tessdata/osd.traineddata" "$dest/tessdata/osd.traineddata"
 
           Write-Host "Bundled Tesseract into $dest"
-
-      - name: List bundle contents (Windows)
-        if: matrix.os == 'windows-latest'
-        shell: pwsh
-        run: |
-          Write-Host "=== Directory structure of backEnd/dist/rustorbust-backend ==="
-          $root = 'backEnd/dist/rustorbust-backend'
-          if (Test-Path $root) {
-            Get-ChildItem -Path $root -Recurse -Depth 5 | ForEach-Object {
-              $indent = '  ' * ($_.FullName.Replace($root, '').Split([IO.Path]::DirectorySeparatorChar).Count - 1)
-              if ($_.PSIsContainer) {
-                Write-Host "$indent[DIR]  $($_.Name)"
-              } else {
-                Write-Host "$indent[FILE] $($_.Name) ($([math]::Round($_.Length/1KB, 0))KB)"
-              }
-            }
-            Write-Host ""
-            Write-Host "=== Checking for Tesseract files ==="
-            $files = @('tesseract.exe', 'tessdata', 'tessdata/eng.traineddata', 'tessdata/osd.traineddata')
-            foreach ($f in $files) {
-              $path = Join-Path $root "tesseract" $f
-              $exists = Test-Path $path
-              Write-Host "[$($exists)] $path"
-            }
-          } else {
-            Write-Host "ERROR: $root does not exist"
-          }
 
       - name: Verify bundled Tesseract (Windows)
         if: matrix.os == 'windows-latest'
@@ -158,10 +113,6 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: npm run make
 
-      - name: Make packages (macOS)
-        if: matrix.os == 'macos-latest'
-        run: npm run make
-
       - name: Upload Windows artifacts
         if: matrix.os == 'windows-latest'
         uses: actions/upload-artifact@v4
@@ -170,13 +121,6 @@ jobs:
           path: out/make/**/*
           if-no-files-found: warn
 
-      - name: Upload macOS artifacts
-        if: matrix.os == 'macos-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: rustorbustapp-macos
-          path: out/make/**/*
-          if-no-files-found: warn
 
       - name: Create Release (on tag push)
         if: startsWith(github.ref, 'refs/tags/')
