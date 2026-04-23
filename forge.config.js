@@ -17,7 +17,12 @@ module.exports = {
     {
       name: '@electron-forge/maker-wix',
       config: {
-        // WiX creates a single .msi installer - no .nupkg needed
+        name: 'RustOrBust',
+        manufacturer: 'ENGR1020',
+        ...(process.env.WINDOWS_CERTIFICATE_FILE && {
+          certificateFile: process.env.WINDOWS_CERTIFICATE_FILE,
+          certificatePassword: process.env.WINDOWS_CERTIFICATE_PASSWORD,
+        }),
       },
       platforms: ['win32'],
     },
