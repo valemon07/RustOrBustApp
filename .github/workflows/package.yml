@@ -10,6 +10,8 @@ on:
 
 jobs:
   package:
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
