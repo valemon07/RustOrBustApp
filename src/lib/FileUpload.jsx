@@ -109,7 +109,7 @@ export default function FileUpload({ className, isDragging = false }) {
   };
 
   const uploadCopy = isProcessing
-    ? "Analysing…"
+    ? "Analyzing…"
     : isDragging
     ? "Drag here."
     : "Drop files here or click to browse";
