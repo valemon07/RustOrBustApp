@@ -118,7 +118,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: rustorbustapp-windows
-          path: out/make/**/*
+          path: out/make/wix/**/*.msi
           if-no-files-found: warn
 
 
@@ -126,7 +126,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
-          files: out/make/**/*
+          files: out/make/wix/**/*.msi
           draft: false
           prerelease: false
         env:

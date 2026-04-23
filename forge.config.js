@@ -15,8 +15,11 @@ module.exports = {
   rebuildConfig: {},
   makers: [
     {
-      name: '@electron-forge/maker-squirrel',
-      config: {},
+      name: '@electron-forge/maker-wix',
+      config: {
+        // WiX creates a single .msi installer - no .nupkg needed
+      },
+      platforms: ['win32'],
     },
     {
       name: '@electron-forge/maker-dmg',
