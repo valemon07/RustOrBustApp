@@ -14,10 +14,6 @@ The /analyze response is a ZIP file containing:
 import csv
 import io
 import os
-<<<<<<< HEAD
-=======
-import os
->>>>>>> d937418ae5920c40f110a9d3c67b627162818b75
 import sys
 import zipfile
 from datetime import datetime
@@ -26,15 +22,9 @@ import cv2
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
-<<<<<<< HEAD
-# Make backend importable regardless of working directory
-_BACKEND_DIR = os.path.abspath(os.path.dirname(__file__))
-sys.path.insert(0, _BACKEND_DIR)
-=======
 # Make backendDev importable regardless of working directory
 _BACKEND_DEV = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "backendDev"))
 sys.path.insert(0, _BACKEND_DEV)
->>>>>>> d937418ae5920c40f110a9d3c67b627162818b75
 
 from run_pipeline import process_image                           # noqa: E402
 from pipeline.stage6_csv_export import CSV_COLUMNS              # noqa: E402
@@ -128,13 +118,7 @@ _setup_tesseract()
 # Flask app
 # ---------------------------------------------------------------------------
 app = Flask(__name__)
-<<<<<<< HEAD
-# In production the Electron renderer loads from file:// or a local vite
-# server — allow all origins so the request always succeeds.
-CORS(app)
-=======
 CORS(app, origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "http://localhost:3000"])
->>>>>>> d937418ae5920c40f110a9d3c67b627162818b75
 
 # Populated during /analyze; read by /flagged-images
 _flagged_images: list = []
@@ -255,10 +239,4 @@ def flagged_images():
 
 
 if __name__ == "__main__":
-<<<<<<< HEAD
-    # When frozen, run without debug mode; in development, enable debug
-    debug = not _is_bundled()
-    app.run(debug=debug, port=5001, host='127.0.0.1')
-=======
     app.run(debug=False, port=5001)
->>>>>>> d937418ae5920c40f110a9d3c67b627162818b75
