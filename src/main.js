@@ -113,11 +113,27 @@ function stopBackend() {
   }
 }
 
+function resolveWindowIconPath() {
+  const candidatePaths = [
+    path.join(app.getAppPath(), 'assets', 'icons', 'app.png'),
+    path.join(process.resourcesPath, 'assets', 'icons', 'app.png'),
+    path.join(__dirname, '..', '..', 'assets', 'icons', 'app.png'),
+  ];
+
+  const foundPath = candidatePaths.find((p) => fs.existsSync(p));
+  if (!foundPath) {
+    console.warn('[window] Icon file not found. Tried:', candidatePaths);
+    return null;
+  }
+
+  return foundPath;
+}
+
 // ── Window ────────────────────────────────────────────────────────────────────
 
 const createWindow = () => {
   const isDev = !!MAIN_WINDOW_VITE_DEV_SERVER_URL;
-  const windowIconPath = path.join(__dirname, '..', '..', 'assets', 'icons', 'app.png');
+  const windowIconPath = resolveWindowIconPath();
 
   if (!isDev) {
     // Remove the app-level menu so it cannot be shown in production.
@@ -129,7 +145,7 @@ const createWindow = () => {
     height: 600,
     minHeight: 600,
     minWidth: 800,
-    icon: windowIconPath,
+    ...(windowIconPath ? { icon: windowIconPath } : {}),
     autoHideMenuBar: !isDev,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
