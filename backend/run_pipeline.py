@@ -18,6 +18,7 @@ from pipeline.stage2_roi import extract_roi_contrast_sweep
 from pipeline.stage3_pit_detection import detect_pits
 from pipeline.stage4_density import calculate_density
 from pipeline.stage6_csv_export import export_row
+from pipeline.stage7_scatter_plot import build_pit_depth_scatter
 from pipeline.config import (
     MANUAL_SCALE_OVERRIDES,
     NO_SCALE_BAR_IMAGES,
@@ -307,18 +308,27 @@ def main():
         print("No images found in", RAW_DIR)
         return
 
+    collected_rows = []
     for image_path in image_paths:
         print(f"Processing {os.path.basename(image_path)} ...", end=" ", flush=True)
         try:
             row_data = process_image(image_path)
             row_data.pop("_debug_vis", None)
             export_row(row_data, CSV_OUT)
+            collected_rows.append(row_data)
             flag_str = f" [FLAGGED: {row_data['reason_for_flag']}]" if row_data["flagged_for_review"] == "Yes" else ""
             print(f"done — {row_data['pit_count']} macro pits{flag_str}")
         except Exception as exc:
             print(f"ERROR — {exc}")
 
     print(f"\nResults written to {CSV_OUT}")
+
+    scatter_png = build_pit_depth_scatter(collected_rows)
+    if scatter_png:
+        scatter_path = os.path.join(os.path.dirname(CSV_OUT), "pit_depth_scatter.png")
+        with open(scatter_path, "wb") as fh:
+            fh.write(scatter_png)
+        print(f"Scatter plot written to {scatter_path}")
 
 
 if __name__ == "__main__":

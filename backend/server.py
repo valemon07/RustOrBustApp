@@ -29,6 +29,7 @@ sys.path.insert(0, _BACKEND_DEV)
 
 from run_pipeline import process_image                           # noqa: E402
 from pipeline.stage6_csv_export import CSV_COLUMNS              # noqa: E402
+from pipeline.stage7_scatter_plot import build_pit_depth_scatter  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Detect PyInstaller bundle and set up paths
@@ -208,6 +209,11 @@ def analyze():
         for row in results:
             writer.writerow({col: row.get(col, "") for col in CSV_COLUMNS})
         zf.writestr("results.csv", csv_buf.getvalue())
+
+        # pit-depth scatter plot (specimen vs mean/max pit depth)
+        scatter_png = build_pit_depth_scatter(results)
+        if scatter_png:
+            zf.writestr("pit_depth_scatter.png", scatter_png)
 
         # one annotated JPEG per image
         for stem, vis in vis_map.items():
