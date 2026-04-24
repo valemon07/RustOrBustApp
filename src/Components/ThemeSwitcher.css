@@ -141,9 +141,12 @@
 }
 
 @media (max-width: 640px) {
-  .theme-switcher {
+  .theme-switcher-wrapper {
     bottom: 16px;
     left: 16px;
+  }
+
+  .theme-switcher {
     padding: 9px 12px;
   }
 

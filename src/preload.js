@@ -3,7 +3,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
-  openFile: (title) => ipcRenderer.invoke('dialog:openFile'),
-  readFile: (filePath) => ipcRenderer.invoke('file:read', filePath),
+  openFile: () => ipcRenderer.invoke('dialog:openFile'),
   readImageAsDataUrl: (filePath) => ipcRenderer.invoke('file:readImageAsDataUrl', filePath),
 });

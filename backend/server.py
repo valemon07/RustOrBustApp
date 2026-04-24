@@ -24,7 +24,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 # Make backendDev importable regardless of working directory
-_BACKEND_DEV = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "backendDev"))
+_BACKEND_DEV = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "backend"))
 sys.path.insert(0, _BACKEND_DEV)
 
 from run_pipeline import process_image                           # noqa: E402

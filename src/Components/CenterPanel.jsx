@@ -1,8 +1,6 @@
 import * as React from "react";
 import "./CenterPanel.css";
 import FileUpload from "../lib/FileUpload";
-import { useContext } from "react";
-import { SettingsContext } from "../contexts/SettingsContext";
 import SettingsPanel from "./SettingsPanel";
 import gearIcon from "../assets/gear-solid-full.svg";
 
@@ -50,8 +48,6 @@ export default function CenterPanel({ showSettings, setShowSettings }) {
     setDragging(false);
     // Let FileUpload handle dropped files, or forward them here if needed.
   };
-
-  const { exportSettings } = useContext(SettingsContext);
 
   return (
     <div className="center-panel-wrapper">
