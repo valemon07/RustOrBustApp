@@ -5,6 +5,7 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 module.exports = {
   packagerConfig: {
     asar: true,
+    icon: path.resolve(__dirname, 'assets', 'icons', 'app'),
     // The PyInstaller-built backend lives outside the asar archive so it can
     // be spawned as a child process.  Electron Forge copies extraResource
     // entries into  <app>/resources/  at package time.
@@ -16,7 +17,9 @@ module.exports = {
   makers: [
     {
       name: '@electron-forge/maker-squirrel',
-      config: {},
+      config: {
+        setupIcon: path.resolve(__dirname, 'assets', 'icons', 'app.ico'),
+      },
     },
     {
       name: '@electron-forge/maker-dmg',

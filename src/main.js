@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import fs from 'node:fs';
@@ -117,12 +117,20 @@ function stopBackend() {
 
 const createWindow = () => {
   const isDev = !!MAIN_WINDOW_VITE_DEV_SERVER_URL;
+  const windowIconPath = path.join(__dirname, '..', '..', 'assets', 'icons', 'app.png');
+
+  if (!isDev) {
+    // Remove the app-level menu so it cannot be shown in production.
+    Menu.setApplicationMenu(null);
+  }
   
   const mainWindow = new BrowserWindow({
     width: 800,
     height: 600,
     minHeight: 600,
     minWidth: 800,
+    icon: windowIconPath,
+    autoHideMenuBar: !isDev,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -133,6 +141,7 @@ const createWindow = () => {
   // Hide menu bar in production, show in development
   if (!isDev) {
     mainWindow.removeMenu();
+    mainWindow.setMenuBarVisibility(false);
   }
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
