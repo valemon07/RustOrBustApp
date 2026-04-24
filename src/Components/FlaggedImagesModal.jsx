@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import "./FlaggedImagesModal.css";
 
 export default function FlaggedImagesModal({ flaggedImages, onClose }) {
@@ -18,18 +18,11 @@ export default function FlaggedImagesModal({ flaggedImages, onClose }) {
     setLoadingImage(true);
     setSelectedImage(filepath);
     try {
-      // Try to load image using IPC API first (for Electron app)
-      if (window.electronAPI && window.electronAPI.readImageAsDataUrl) {
-        const dataUrl = await window.electronAPI.readImageAsDataUrl(filepath);
-        setImageDataUrl(dataUrl);
-      } else {
-        // Fall back to direct URL for web (or file:// URLs)
-        setImageDataUrl(filepath);
-      }
+      const dataUrl = await window.electronAPI.readImageAsDataUrl(filepath);
+      setImageDataUrl(dataUrl);
     } catch (err) {
       console.error("Error loading image:", err);
-      // Try using file:// URL as fallback
-      setImageDataUrl(`file://${filepath}`);
+      setImageDataUrl(null);
     } finally {
       setLoadingImage(false);
       setImageViewerOpen(true);

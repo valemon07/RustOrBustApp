@@ -15,7 +15,6 @@ if (started) {
 // ---------------------------------------------------------------------------
 let backendProcess = null;
 const BACKEND_PORT = 5001;
-const BACKEND_URL = `http://127.0.0.1:${BACKEND_PORT}`;
 
 function getBackendPath() {
   const isDev = !!MAIN_WINDOW_VITE_DEV_SERVER_URL;
@@ -23,11 +22,11 @@ function getBackendPath() {
   if (isDev) {
     // Development: use merged backend folder with venv
     const appRoot = app.getAppPath();
-    const venvPython = path.join(appRoot, 'backEnd', '.venv', 'Scripts', 'python.exe');
+    const venvPython = path.join(appRoot, 'backend', '.venv', 'Scripts', 'python.exe');
     const pythonCmd = fs.existsSync(venvPython) ? venvPython : 'python';
     return {
       command: pythonCmd,
-      args: [path.join(appRoot, 'backEnd', 'server.py')],
+      args: [path.join(appRoot, 'backend', 'server.py')],
     };
   }
 
@@ -63,10 +62,10 @@ function startBackend() {
     cwd: path.isAbsolute(command) ? path.dirname(command) : undefined,
   });
 
-  flaskProcess.stdout.on('data', (d) => console.log(`[Flask] ${d.toString().trimEnd()}`));
-  flaskProcess.stderr.on('data', (d) => console.error(`[Flask] ${d.toString().trimEnd()}`));
-  flaskProcess.on('error', (err) => console.error('[Flask] Failed to start:', err.message));
-  flaskProcess.on('exit', (code) => console.log(`[Flask] Exited with code ${code}`));
+  backendProcess.stdout.on('data', (d) => console.log(`[backend] ${d.toString().trimEnd()}`));
+  backendProcess.stderr.on('data', (d) => console.error(`[backend] ${d.toString().trimEnd()}`));
+  backendProcess.on('error', (err) => console.error('[backend] Failed to start:', err.message));
+  backendProcess.on('exit', (code) => console.log(`[backend] Exited with code ${code}`));
 }
 
 /**
@@ -74,7 +73,7 @@ function startBackend() {
  * Resolves when ready; resolves (with a warning) if max attempts exceeded so
  * the window still opens even if Flask is slow to start.
  */
-function waitForFlask(maxAttempts = 40, delayMs = 250) {
+function waitForBackend(maxAttempts = 40, delayMs = 250) {
   return new Promise((resolve) => {
     let attempts = 0;
 
@@ -84,14 +83,14 @@ function waitForFlask(maxAttempts = 40, delayMs = 250) {
 
       socket.on('connect', () => {
         socket.destroy();
-        console.log('[Flask] Server is ready.');
+        console.log('[backend] Server is ready.');
         resolve();
       });
 
       const retry = () => {
         socket.destroy();
         if (++attempts >= maxAttempts) {
-          console.warn('[Flask] Did not respond in time — opening window anyway.');
+          console.warn('[backend] Did not respond in time - opening window anyway.');
           resolve();
         } else {
           setTimeout(check, delayMs);
@@ -100,17 +99,17 @@ function waitForFlask(maxAttempts = 40, delayMs = 250) {
 
       socket.on('error', retry);
       socket.on('timeout', retry);
-      socket.connect(5001, '127.0.0.1');
+      socket.connect(BACKEND_PORT, '127.0.0.1');
     };
 
     check();
   });
 }
 
-function stopFlaskServer() {
-  if (flaskProcess) {
-    flaskProcess.kill();
-    flaskProcess = null;
+function stopBackend() {
+  if (backendProcess) {
+    backendProcess.kill();
+    backendProcess = null;
   }
 }
 
@@ -142,14 +141,16 @@ const createWindow = () => {
     mainWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
   }
 
-  mainWindow.webContents.openDevTools();
+  if (isDev) {
+    mainWindow.webContents.openDevTools();
+  }
 };
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 
 app.whenReady().then(async () => {
-  startFlaskServer();
-  await waitForFlask();
+  startBackend();
+  await waitForBackend();
   createWindow();
 
   app.on('activate', () => {
@@ -160,14 +161,14 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
-  stopFlaskServer();
+  stopBackend();
   if (process.platform !== 'darwin') {
     app.quit();
   }
 });
 
 app.on('will-quit', () => {
-  stopFlaskServer();
+  stopBackend();
 });
 
 // ── IPC handlers ──────────────────────────────────────────────────────────────

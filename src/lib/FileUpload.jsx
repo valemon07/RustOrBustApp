@@ -4,8 +4,9 @@ import FlaggedImagesModal from "../Components/FlaggedImagesModal";
 import { SettingsContext } from "../contexts/SettingsContext";
 import folderIcon from "../assets/folder-open-solid-full.svg";
 
-const ANALYZE_URL = "http://localhost:5001/analyze";
-const FLAGGED_URL = "http://localhost:5001/flagged-images";
+const BACKEND_BASE_URL = "http://localhost:5001";
+const ANALYZE_URL = `${BACKEND_BASE_URL}/analyze`;
+const FLAGGED_URL = `${BACKEND_BASE_URL}/flagged-images`;
 
 export default function FileUpload({ className, isDragging = false }) {
   const { settings } = useContext(SettingsContext);

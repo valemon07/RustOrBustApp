@@ -37,7 +37,7 @@ jobs:
         with:
           python-version: '3.11'
           cache: 'pip'
-          cache-dependency-path: 'backEnd/requirements.txt'
+          cache-dependency-path: 'backend/requirements.txt'
 
       - name: Install Tesseract (Windows)
         if: matrix.os == 'windows-latest'
@@ -63,7 +63,7 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          cd backEnd
+          cd backend
           pip install -r requirements.txt
 
       - name: Build backend
@@ -76,7 +76,7 @@ jobs:
           if (-not $env:TESSERACT_DIR) { throw "TESSERACT_DIR is not set" }
 
           $src = $env:TESSERACT_DIR
-          $dest = "backEnd/dist/rustorbust-backend/tesseract"
+          $dest = "backend/dist/rustorbust-backend/tesseract"
 
           New-Item -ItemType Directory -Force -Path "$dest/tessdata" | Out-Null
 
@@ -90,7 +90,7 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          $root = 'backEnd/dist/rustorbust-backend/tesseract'
+          $root = 'backend/dist/rustorbust-backend/tesseract'
           $required = @(
             "$root/tesseract.exe",
             "$root/tessdata/eng.traineddata",
